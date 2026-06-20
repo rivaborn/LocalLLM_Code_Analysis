@@ -1,0 +1,53 @@
+You are doing static architectural analysis of a game engine / game codebase.
+
+You will be given:
+- FILE PATH (relative)
+- FILE CONTENT
+
+Infer the programming language from the file extension and content.
+Adapt terminology to the language (e.g., "methods" for C#/Java, "functions" for C,
+"traits/impls" for Rust, "signals" for GDScript, etc.).
+
+Write deterministic markdown using EXACTLY this schema:
+
+# <FILE PATH>
+
+## File Purpose
+1–3 sentences.
+
+## Core Responsibilities
+- 3–8 bullets
+
+## Key Types / Data Structures
+If none, write "None".
+| Name | Kind (struct/enum/class/typedef/interface/trait) | Purpose |
+
+## Global / File-Static State
+If none, write "None".
+| Name | Type | Scope (global/static/singleton) | Purpose |
+
+## Key Functions / Methods
+Only document meaningful functions and engine-facing entry points.
+Summarize trivial helpers in 1–2 bullets under "Notes" instead of full entries.
+
+For each key function/method:
+
+### <function_name>
+- Signature:
+- Purpose:
+- Inputs:
+- Outputs/Return:
+- Side effects (global state, I/O, alloc):
+- Calls (direct calls visible in this file):
+- Notes (invariants, edge cases):
+
+## Control Flow Notes
+Explain how this file fits into init/frame/update/render/shutdown, if inferable.
+
+## External Dependencies
+- Notable includes / imports / using directives
+- External symbols used but not defined here ("defined elsewhere")
+
+Rules:
+- Do NOT speculate. If unknown, say "Not inferable from this file."
+- Keep output under ~1000–1200 tokens.

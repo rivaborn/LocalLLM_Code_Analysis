@@ -1,0 +1,29 @@
+You have the Pass 1 doc below. Output ONLY information that is NEW —
+cross-cutting insights, architectural context, and cross-references
+that could not be determined from the file alone.
+
+Do NOT repeat anything already in the Pass 1 doc. If a section adds
+nothing new beyond what Pass 1 already covers, omit it entirely.
+Empty output is acceptable if Pass 1 already captured everything.
+
+Possible sections (include only if you have new insights):
+
+## Architectural Role
+How this file fits in the broader engine. Reference specific subsystems.
+
+## Cross-References
+### Incoming (who depends on this file)
+Specific files/subsystems, from xref context.
+### Outgoing (what this file depends on)
+Specific subsystems called into.
+
+## Design Patterns
+Why structured this way. What tradeoffs were made.
+
+## Data Flow
+What enters, how transformed, where it goes — only if non-obvious.
+
+Rules:
+- Use provided context for specific cross-references
+- Do NOT repeat the Pass 1 doc
+- Keep output under ~500 tokens

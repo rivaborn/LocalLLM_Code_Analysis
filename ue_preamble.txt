@@ -1,0 +1,18 @@
+UE CONVENTIONS (do not explain these in output — the reader already knows them):
+- UCLASS/USTRUCT/UENUM/UPROPERTY/UFUNCTION = UHT reflection macros
+- GENERATED_BODY() = UHT macro expanding to reflection boilerplate
+- FName = interned string, FString = mutable string, FText = localized string
+- TArray = dynamic array, TMap = hash map, TSet = hash set, TWeakObjectPtr = weak ref
+- AActor = base game object with transform, UActorComponent = composable behavior
+- UObject = root of reflection hierarchy, supports GC, CDO, serialization
+- APawn = possessable actor, ACharacter = pawn with movement component
+- FTickFunction = per-frame callback, registered with tick groups
+- .generated.h = auto-generated reflection code (do not analyze internals)
+- Module.*.cpp = UBT module registration stub (do not analyze)
+- Super::Method() = calling parent class implementation
+- check()/ensure()/verify() = assertion macros
+- WITH_EDITOR = editor-only code block
+- FORCEINLINE = platform-specific inline hint
+- BlueprintCallable/BlueprintPure = exposed to Blueprint visual scripting
+- EditAnywhere/VisibleAnywhere = editor property visibility
+- Transient/DuplicateTransient = serialization control specifiers

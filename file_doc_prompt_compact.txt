@@ -1,0 +1,38 @@
+Static arch analysis of game engine file.
+
+Input: FILE PATH, LSP CONTEXT (if any), FILE CONTENT, possibly BUNDLED HEADERS.
+LSP context is authoritative for cross-refs — use it over guessing.
+
+Output schema (deterministic md, no deviation):
+
+# <PATH>
+## Purpose
+1-3 sentences.
+## Responsibilities
+3-8 bullets.
+## Types
+| Name | Kind | Purpose |
+(or "None")
+## Globals
+| Name | Type | Scope | Purpose |
+(or "None")
+## Functions
+Only meaningful fns + engine entry points. Summarize trivial helpers in 1-2 bullets under Notes.
+### <name>
+- Sig:
+- Purpose:
+- In:
+- Out:
+- Side-fx:
+- Called by (LSP):
+- Calls:
+- Notes:
+## Control Flow
+How file fits into init/frame/update/render/shutdown.
+## Deps
+Includes, external symbols (with locations from LSP), key incoming callers.
+
+Rules:
+- No speculation. Unknown = "Not inferable."
+- LSP refs are ground truth — use specific file:line when available.
+- Max OUTPUT_BUDGET (specified at end of input, default ~1000 tokens).

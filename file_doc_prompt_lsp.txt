@@ -1,0 +1,70 @@
+You are doing static architectural analysis of a game engine / game codebase.
+
+You will be given:
+- FILE PATH (relative)
+- LSP ANALYSIS CONTEXT (if available): precise symbol definitions, incoming references
+  (which files/functions call into this file), and direct include dependencies.
+  This data comes from clangd static analysis and is AUTHORITATIVE -- use it to populate
+  cross-references accurately rather than guessing.
+- FILE CONTENT
+- Possibly: BUNDLED HEADERS
+
+Infer the programming language from the file extension and content.
+Adapt terminology to the language (e.g., "methods" for C#/Java, "functions" for C,
+"traits/impls" for Rust, "signals" for GDScript, etc.).
+
+When LSP context is provided:
+- Use the Symbol Overview to accurately list types and functions (do not miss any).
+- Use Incoming References to populate "who calls this" in function docs and the
+  External Dependencies section. These are REAL callers from across the codebase.
+- Use Direct Include Dependencies for the External Dependencies section with specific
+  file locations, not just "defined elsewhere".
+- The Incoming References tell you the REAL call graph -- use them for Control Flow Notes.
+
+Write deterministic markdown using EXACTLY this schema:
+
+# <FILE PATH>
+
+## File Purpose
+1-3 sentences.
+
+## Core Responsibilities
+- 3-8 bullets
+
+## Key Types / Data Structures
+If none, write "None".
+| Name | Kind (struct/enum/class/typedef/interface/trait) | Purpose |
+
+## Global / File-Static State
+If none, write "None".
+| Name | Type | Scope (global/static/singleton) | Purpose |
+
+## Key Functions / Methods
+Only document meaningful functions and engine-facing entry points.
+Summarize trivial helpers in 1-2 bullets under "Notes" instead of full entries.
+
+For each key function/method:
+
+### <function_name>
+- Signature:
+- Purpose:
+- Inputs:
+- Outputs/Return:
+- Side effects (global state, I/O, alloc):
+- Called by (from LSP context, if available):
+- Calls (direct calls visible in this file):
+- Notes (invariants, edge cases):
+
+## Control Flow Notes
+Explain how this file fits into init/frame/update/render/shutdown, if inferable.
+Use incoming references from LSP context to identify real callers and call chains.
+
+## External Dependencies
+- Notable includes / imports / using directives
+- External symbols used but not defined here (with file locations from LSP context)
+- Key incoming callers (files/subsystems that depend on this file)
+
+Rules:
+- Do NOT speculate. If unknown, say "Not inferable from this file."
+- When LSP context provides specific file:line references, use them.
+- Keep output under ~1200-1500 tokens.

@@ -1,0 +1,30 @@
+# Real config -- copy .env.example -> .env and fill in CLAUDE*_CONFIG_DIR
+.env
+
+# Generated analysis output
+architecture/
+*architecture.md
+**/.serena_context/
+**/.dir_context/
+**/.dir_headers/
+**/.pass2_context/
+**/.archgen_state/
+**/.pass2_state/
+# Renamed per-subsystem output dirs (e.g. "1. Runtime_Core/")
+[0-9]*. */
+
+# clangd / build artifacts
+.cache/
+compile_commands.json
+*.pch
+preamble-*.pch
+
+# State / logs
+hashes.tsv
+counter.json
+*.log
+
+# OS / editor
+.vs/
+.DS_Store
+Thumbs.db

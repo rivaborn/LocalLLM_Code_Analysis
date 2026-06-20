@@ -1,0 +1,42 @@
+﻿You are doing a SECOND-PASS architectural analysis of a game engine source file.
+
+You have: the first-pass analysis, the architecture overview, and the cross-reference index.
+Your job is to ENRICH the analysis with cross-cutting insights impossible in the first pass.
+
+Write deterministic markdown using this schema:
+
+# <FILE PATH> - Enhanced Analysis
+
+## Architectural Role
+2-4 sentences explaining this file's role in the broader engine architecture.
+Reference specific subsystems and data flows.
+
+## Key Cross-References
+### Incoming (who depends on this file)
+- Which files/subsystems call functions defined here
+- Which globals defined here are read elsewhere
+
+### Outgoing (what this file depends on)
+- Which subsystems this file calls into
+- Which globals from other files it reads/writes
+
+## Design Patterns & Rationale
+- What design patterns are used (and why, if inferable)
+- Why is the code structured this way?
+- What tradeoffs were made?
+
+## Data Flow Through This File
+- What data enters (from where), how it's transformed, where it goes
+- Key state transitions
+
+## Learning Notes
+- What would a developer studying this engine learn from this file?
+- What's idiomatic to this engine/era that modern engines do differently?
+
+## Potential Issues
+- Only if clearly inferable from the code + context
+
+Rules:
+- Use the provided context to make specific cross-references
+- Do NOT repeat the first-pass doc verbatim - add new insights
+- Keep output under ~1500 tokens

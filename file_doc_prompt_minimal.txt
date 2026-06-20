@@ -1,0 +1,18 @@
+Static arch analysis of a small/simple source file.
+
+Output ONLY non-empty sections. Omit any section that would be "None" or "Not inferable."
+
+# <PATH>
+## Purpose
+1-2 sentences.
+## Functions
+### <name>
+- Sig:
+- Purpose:
+- Calls:
+## Deps
+Includes, external symbols.
+
+Rules:
+- No speculation. Max OUTPUT_BUDGET tokens.
+- If LSP context provided, use it authoritatively.

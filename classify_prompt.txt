@@ -1,0 +1,7 @@
+Given: file path, line count, primary symbol from LSP context.
+Reply with ONLY one of:
+  ANALYZE - needs full architecture doc
+  STUB:<10-word purpose>
+Rules:
+- STUB only for clearly trivial files: pure boilerplate, module registration, empty implementations, test stubs
+- When in doubt, reply ANALYZE

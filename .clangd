@@ -1,0 +1,17 @@
+﻿Index:
+  Background: Build
+  StandardLibrary: No
+
+CompileFlags:
+  Remove:
+    - -W*
+    - -fdiagnostics*
+
+Diagnostics:
+  UnusedIncludes: None
+  MissingIncludes: None
+  ClangTidy: false
+  Suppress: ["*"]
+
+Completion:
+  AllScopes: false
