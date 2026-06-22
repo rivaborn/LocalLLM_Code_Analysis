@@ -153,7 +153,7 @@ Baseline ~250M tokens -> after v1-v3: ~12M tokens (95% reduction)
 Toolkit docs live in `llm_doc/`:
 - `llm_doc/SETUP.md` — Full setup guide
 - `llm_doc/Instructions.md` — Per-script CLI reference
-- `llm_doc/Quickstart.md` — Condensed reference
+- `Quickstart.md` — Condensed reference (at repo root)
 - `llm_doc/SerenaFinal.md` — Complete LSP-extraction technical reference
 - `llm_doc/FileReference.md` — Index of all files
 - `llm_doc/Optimizations.md` — Token optimization strategies

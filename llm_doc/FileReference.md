@@ -117,7 +117,7 @@ Single consolidated optimization document covering all 28 token optimization str
 ### llm_doc/Instructions.md — Command Reference
 Complete CLI reference for every script. Covers syntax, all parameters with types and defaults, usage examples, .env variables, presets, and common workflows. Includes adaptive parallelism docs, RAM budget guide, and performance log details.
 
-### llm_doc/Quickstart.md — Condensed Reference
+### Quickstart.md — Condensed Reference (repo root)
 Condensed quick-reference: pipeline order, minimal setup, per-script options, model/backend notes, `.env` variables, presets, output layout, and resumability rules.
 
 ### llm_doc/UnitTests.md — Unit Test Reference

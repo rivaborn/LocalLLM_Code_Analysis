@@ -56,7 +56,7 @@ See `llm_scripts/llm_core.ps1` for the implementation and `.env.example` for all
 - `CLAUDE.md` — toolkit guide (pipeline, config, known issues)
 - `llm_scripts/` — the pipeline scripts (`.ps1` + `serena_extract.py`)
 - `llm_prompts/` — LLM prompt templates (`file_doc_prompt_*.txt`, system prompt, classify, preamble)
-- `llm_doc/Quickstart.md` — condensed reference
+- `Quickstart.md` — condensed reference (repo root)
 - `llm_doc/Instructions.md` — per-script CLI reference
 - `llm_doc/SETUP.md` — full setup guide
 - `llm_doc/SerenaFinal.md` — LSP-extraction technical reference
