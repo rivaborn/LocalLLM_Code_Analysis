@@ -37,6 +37,7 @@ param(
     [int]   $llmMaxTokens = 1000,
     [int]   $llmTimeout = 900,
     [int]   $llmNumCtx = 0,
+    [bool]  $llmThink = $false,
     [string]$toolkitDir = ""
 )
 
@@ -458,7 +459,7 @@ while ($true) {
             $sysPrompt = Get-Content $sysPromptFile -Raw -Encoding UTF8
             $resp = Invoke-LocalLLM -SystemPrompt $sysPrompt -UserPrompt $payload `
                 -Backend $llmBackend -Endpoint $llmEndpoint -Model $llmModel `
-                -Temperature $llmTemp -MaxTokens $localMax -Timeout $llmTimeout -NumCtx $llmNumCtx
+                -Temperature $llmTemp -MaxTokens $localMax -Timeout $llmTimeout -NumCtx $llmNumCtx -Think $llmThink
             $exitCode = 0
         }
     } catch {

@@ -728,6 +728,7 @@ $llmTemp      = [double](Cfg $cfg 'LLM_TEMPERATURE' '0.1')
 $llmMaxTokens = [int](Cfg $cfg 'LLM_OVERVIEW_MAX_TOKENS' (Cfg $cfg 'LLM_MAX_TOKENS' '8000'))
 $llmTimeout   = [int](Cfg $cfg 'LLM_TIMEOUT' '900')
 $llmNumCtx    = [int](Cfg $cfg 'LLM_NUM_CTX' '0')
+$llmThink     = ((Cfg $cfg 'LLM_THINK' 'false').Trim().ToLower() -eq 'true')
 if ($llmBackend -ne 'claude') {
     $llmEndpoint = Get-LLMEndpoint -Cfg $cfg -Backend $llmBackend
     $llmModel    = Get-LLMModel -Cfg $cfg
@@ -791,7 +792,7 @@ function Invoke-Claude($prompt, $label) {
             try {
                 $stdoutRaw = Invoke-LocalLLM -SystemPrompt '' -UserPrompt $currentPrompt `
                     -Backend $llmBackend -Endpoint $llmEndpoint -Model $llmModel `
-                    -Temperature $llmTemp -MaxTokens $llmMaxTokens -Timeout $llmTimeout -NumCtx $llmNumCtx
+                    -Temperature $llmTemp -MaxTokens $llmMaxTokens -Timeout $llmTimeout -NumCtx $llmNumCtx -Think $llmThink
                 $exitCode  = 0
                 $stderrRaw = ''
             } catch {

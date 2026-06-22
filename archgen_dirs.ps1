@@ -321,6 +321,7 @@ $llmTemp      = [double](Cfg 'LLM_TEMPERATURE' '0.1')
 $llmMaxTokens = [int](Cfg 'LLM_DIR_MAX_TOKENS' (Cfg 'LLM_MAX_TOKENS' '4000'))
 $llmTimeout   = [int](Cfg 'LLM_TIMEOUT' '900')
 $llmNumCtx    = [int](Cfg 'LLM_NUM_CTX' '0')
+$llmThink     = ((Cfg 'LLM_THINK' 'false').Trim().ToLower() -eq 'true')
 if ($llmBackend -ne 'claude') {
     $llmEndpoint = Get-LLMEndpoint -Cfg $script:cfg -Backend $llmBackend
     $llmModel    = Get-LLMModel -Cfg $script:cfg
@@ -401,7 +402,7 @@ foreach ($dir in $queue) {
         } else {
             $respText = Invoke-LocalLLM -SystemPrompt '' -UserPrompt $payload `
                 -Backend $llmBackend -Endpoint $llmEndpoint -Model $llmModel `
-                -Temperature $llmTemp -MaxTokens $llmMaxTokens -Timeout $llmTimeout -NumCtx $llmNumCtx
+                -Temperature $llmTemp -MaxTokens $llmMaxTokens -Timeout $llmTimeout -NumCtx $llmNumCtx -Think $llmThink
             $exitCode = 0
         }
         if ($exitCode -eq 0 -and $respText.Length -gt 0) {

@@ -79,15 +79,15 @@ The workflow is **one subsystem at a time**: analyze, then rename `architecture/
 
 ## Local LLM backend (LLMConfig)
 
-The LLM-driven stages can run against the homelab **LLMConfig** vLLM gateway instead of the `claude` CLI. The backend is selected by `LLM_BACKEND` in `.env`:
+The LLM-driven stages can run against the homelab **LLMConfig** box instead of the `claude` CLI. The backend is selected by `LLM_BACKEND` in `.env`:
 
-- **`vllm`** (default) — LLMConfig OpenAI `/v1` gateway at `http://192.168.1.40:11430` (the box's static IP). The gateway auto-loads the model on first request.
-- **`ollama`** — raw Ollama server at `http://<LLM_HOST>:<LLM_PORT>` (default `:11434`).
-- **`claude`** — the legacy `claude` CLI path (haiku/sonnet via the `CLAUDE_*` keys). This is the only backend that requires a valid `CLAUDE{1,2}_CONFIG_DIR`.
+- **`ollama`** (current default) — raw Ollama server at `http://<LLM_HOST>:<LLM_PORT>` (default `:11434`), serving **`qwen3.6:27B`**. This is a **thinking model**: with `LLM_THINK=true` and the native `/api/chat` path (used when `LLM_NUM_CTX>0`), its reasoning goes to a separate `message.thinking` field and is kept OUT of the doc content. Slower than vLLM (reasoning pass every call) but produces clean Qwen-3.6 output. NOTE: this hits raw Ollama directly, bypassing the gateway's GPU arbitration — before a run, load the model once via the gateway (`POST :11430/api/load {server:ollama,model:qwen3.6:27B}`) so Ollama owns the card.
+- **`vllm`** — LLMConfig OpenAI `/v1` gateway at `http://192.168.1.40:11430`; auto-loads the model on first request. Fast (~1s/call). Use a non-thinking served-name like `qwen3-coder-30b` — thinking models (e.g. `qwen3.6-27b`) leak chain-of-thought into content here (no reasoning-parser on the gateway).
+- **`claude`** — the legacy `claude` CLI path (haiku/sonnet via the `CLAUDE_*` keys). The only backend that requires a valid `CLAUDE{1,2}_CONFIG_DIR`.
 
-Relevant `.env` keys: `LLM_BACKEND`, `LLM_HOST`, `LLM_ENDPOINT` (full-URL override), `LLM_PORT` (ollama only), `LLM_DEFAULT_MODEL` (default `qwen3-coder-30b`, a vLLM served-name), `LLM_TEMPERATURE`, `LLM_MAX_TOKENS`, `LLM_TIMEOUT`, `LLM_NUM_CTX` (ollama `/api/chat` only). `arch_overview.ps1` and `archgen_dirs.ps1` use larger budgets via `LLM_OVERVIEW_MAX_TOKENS` / `LLM_DIR_MAX_TOKENS`.
+Relevant `.env` keys: `LLM_BACKEND`, `LLM_HOST`, `LLM_ENDPOINT` (full-URL override), `LLM_PORT` (ollama only), `LLM_DEFAULT_MODEL` (default `qwen3.6:27B`; Ollama tags use `:`, vLLM served-names use `-`), `LLM_THINK` (ollama thinking-model reasoning separation), `LLM_TEMPERATURE`, `LLM_MAX_TOKENS`, `LLM_TIMEOUT`, `LLM_NUM_CTX` (ollama `/api/chat` only, must be >0 for the native path). `arch_overview.ps1` and `archgen_dirs.ps1` use larger budgets via `LLM_OVERVIEW_MAX_TOKENS` / `LLM_DIR_MAX_TOKENS`.
 
-Implementation: `llm_core.ps1` (`Get-LLMBackend` / `Get-LLMEndpoint` / `Get-LLMModel` / `Invoke-LocalLLM`) is dot-sourced by every LLM-calling script. Because `*_worker.ps1` run in `Start-Job` runspaces, they dot-source `llm_core.ps1` themselves and receive the resolved backend/endpoint/model as `-llm*` parameters from their parent. Each call site branches on `$llmBackend`: `claude` keeps the original `& claude` path; anything else calls `Invoke-LocalLLM`. The vLLM path posts to `/v1/chat/completions` (OpenAI schema); the ollama path posts to `/api/chat` when `LLM_NUM_CTX>0`. Model ids: vLLM served-names use hyphens (`qwen3.6-27b`), Ollama tags use colons (`qwen3.6:35b-a3b`).
+Implementation: `llm_core.ps1` (`Get-LLMBackend` / `Get-LLMEndpoint` / `Get-LLMModel` / `Invoke-LocalLLM`) is dot-sourced by every LLM-calling script. Because `*_worker.ps1` run in `Start-Job` runspaces (where `$PSScriptRoot` is empty), they dot-source `llm_core.ps1` via a `toolkitDir` passed from the parent, and receive the resolved backend/endpoint/model/think flags as `-llm*` parameters. Each call site branches on `$llmBackend`: `claude` keeps the original `& claude` path; anything else calls `Invoke-LocalLLM`. The vLLM path posts to `/v1/chat/completions` (OpenAI schema); the ollama path posts to `/api/chat` when `NumCtx>0` (sending `think` when enabled). When `-Think` is on, `Invoke-LocalLLM` floors the token budget (`LLM_THINK_MIN_TOKENS`, 8000) so reasoning + content both fit.
 
 ## Known Issues and Bugs
 

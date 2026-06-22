@@ -182,6 +182,7 @@ $llmTemp      = [double](Cfg 'LLM_TEMPERATURE' '0.1')
 $llmMaxTokens = [int](Cfg 'LLM_MAX_TOKENS' '1000')
 $llmTimeout   = [int](Cfg 'LLM_TIMEOUT' '900')
 $llmNumCtx    = [int](Cfg 'LLM_NUM_CTX' '0')
+$llmThink     = ((Cfg 'LLM_THINK' 'false').Trim().ToLower() -eq 'true')
 if ($llmBackend -ne 'claude') {
     $llmEndpoint = Get-LLMEndpoint -Cfg $cfg -Backend $llmBackend
     $llmModel    = Get-LLMModel -Cfg $cfg
@@ -1480,7 +1481,7 @@ if ($useClassify -eq '1' -and $queue.Count -gt 0) {
                     $classSys = Get-Content $classifyPrompt -Raw -Encoding UTF8
                     $classText = Invoke-LocalLLM -SystemPrompt $classSys -UserPrompt $classPayload `
                         -Backend $llmBackend -Endpoint $llmEndpoint -Model $llmModel `
-                        -Temperature $llmTemp -MaxTokens 30 -Timeout $llmTimeout -NumCtx $llmNumCtx
+                        -Temperature $llmTemp -MaxTokens 30 -Timeout $llmTimeout -NumCtx $llmNumCtx -Think $llmThink
                 }
                 if ($classText -match '^STUB:(.+)') {
                     $stubPurpose = $Matches[1].Trim()
@@ -1626,7 +1627,7 @@ foreach ($item in $dispatchQueue) {
         $serenaArg, $bundleHdrDoc, $outputBudget, $preambleContent, $elideSource,
         $maxTokensArg, $dirContextDir, $sharedHeaderDir, $useJsonOutput,
         $llmBackend, $llmEndpoint, $llmModel, $llmTemp, $llmMaxTokens, $llmTimeout, $llmNumCtx,
-        $PSScriptRoot
+        $llmThink, $PSScriptRoot
 
     $running.Add([pscustomobject]@{ Job = $j; Rel = $firstRel })
     Show-Progress $toDo $startTime $rateLimitFile

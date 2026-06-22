@@ -20,7 +20,12 @@
 $script:LLM_GATEWAY_PORT = '11430'   # LLMConfig OpenAI /v1 gateway (vllm)
 $script:LLM_OLLAMA_PORT  = '11434'   # native Ollama server (ollama)
 $script:LLM_DEFAULT_HOST = '192.168.1.40'
-$script:LLM_DEFAULT_MODEL_FALLBACK = 'qwen3-coder-30b'
+$script:LLM_DEFAULT_MODEL_FALLBACK = 'qwen3.6:27B'
+# Thinking models split num_predict between reasoning AND content; too small a
+# budget yields empty/truncated content. Floor it when -Think is on. num_predict
+# is a cap (not a target), so a generous floor only helps files that need it and
+# does not slow files whose output finishes early.
+$script:LLM_THINK_MIN_TOKENS = 8000
 
 function Get-LLMCfgVal {
     # Lookup a key in an optional -Cfg hashtable; empty string counts as unset.
@@ -80,7 +85,7 @@ function Invoke-LocalLLM {
         [string]$UserPrompt,
         [string]$Backend     = 'vllm',
         [string]$Endpoint    = '',
-        [string]$Model       = 'qwen3-coder-30b',
+        [string]$Model       = 'qwen3.6:27B',
         [double]$Temperature = 0.1,
         [int]   $MaxTokens   = 800,
         [int]   $NumCtx      = 0,
@@ -96,6 +101,12 @@ function Invoke-LocalLLM {
         $Endpoint = Get-LLMEndpoint -Backend $Backend
     }
     $Endpoint = $Endpoint.TrimEnd('/')
+
+    # Thinking models emit reasoning AND content from the same num_predict budget;
+    # too small a budget returns empty content. Floor it when -Think is on.
+    if ($Think -and $MaxTokens -lt $script:LLM_THINK_MIN_TOKENS) {
+        $MaxTokens = $script:LLM_THINK_MIN_TOKENS
+    }
 
     $messages = @()
     if ($SystemPrompt -and $SystemPrompt.Trim() -ne '') {

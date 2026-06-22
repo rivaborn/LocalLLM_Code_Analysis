@@ -445,6 +445,7 @@ $llmTemp      = [double](Cfg $cfg 'LLM_TEMPERATURE' '0.1')
 $llmMaxTokens = [int](Cfg $cfg 'LLM_MAX_TOKENS' '1000')
 $llmTimeout   = [int](Cfg $cfg 'LLM_TIMEOUT' '900')
 $llmNumCtx    = [int](Cfg $cfg 'LLM_NUM_CTX' '0')
+$llmThink     = ((Cfg $cfg 'LLM_THINK' 'false').Trim().ToLower() -eq 'true')
 if ($llmBackend -ne 'claude') {
     $llmEndpoint = Get-LLMEndpoint -Cfg $cfg -Backend $llmBackend
     $llmModel    = Get-LLMModel -Cfg $cfg
@@ -775,7 +776,7 @@ foreach ($rel in $queue) {
         $fatalFlag, $fatalMsg, $errorLog, $rateLimitFile,
         $archContext, $xrefContext,
         $llmBackend, $llmEndpoint, $llmModel, $llmTemp, $llmMaxTokens, $llmTimeout, $llmNumCtx,
-        $PSScriptRoot
+        $llmThink, $PSScriptRoot
     $running.Add($j) | Out-Null
 }
 
