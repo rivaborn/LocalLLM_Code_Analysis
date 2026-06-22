@@ -451,6 +451,12 @@ if ($llmBackend -ne 'claude') {
     $llmModel    = Get-LLMModel -Cfg $cfg
     Write-Host "LLM backend: $llmBackend ($llmEndpoint, model=$llmModel)" -ForegroundColor Green
 }
+# Ollama splits num_ctx across concurrent slots, overflowing large files and
+# returning empty content. Force serial dispatch on the ollama backend.
+if ($llmBackend -eq 'ollama' -and $jobCount -gt 1) {
+    Write-Host "Ollama backend: forcing Jobs=1 (concurrent requests split num_ctx and drop large files)" -ForegroundColor Yellow
+    $jobCount = 1
+}
 
 $cfgDirKey    = if ($Claude1) { 'CLAUDE1_CONFIG_DIR' } else { 'CLAUDE2_CONFIG_DIR' }
 $claudeCfgDir = Cfg $cfg $cfgDirKey ''
