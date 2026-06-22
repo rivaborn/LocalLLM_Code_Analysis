@@ -8,20 +8,20 @@
 
 ```powershell
 # Run all tests (PowerShell)
-.\archgen.ps1 -Test
-.\archxref.ps1 -Test
-.\archgraph.ps1 -Test
-.\arch_overview.ps1 -Test
-.\archpass2.ps1 -Test
-.\archpass2_context.ps1 -Test
-.\archgen_dirs.ps1 -Test
-.\serena_extract.ps1 -Test
+.\llm_scripts\archgen.ps1 -Test
+.\llm_scripts\archxref.ps1 -Test
+.\llm_scripts\archgraph.ps1 -Test
+.\llm_scripts\arch_overview.ps1 -Test
+.\llm_scripts\archpass2.ps1 -Test
+.\llm_scripts\archpass2_context.ps1 -Test
+.\llm_scripts\archgen_dirs.ps1 -Test
+.\llm_scripts\serena_extract.ps1 -Test
 
 # Run Python tests
-uv run --python 3.12 serena_extract.py --test
+uv run --python 3.12 llm_scripts\serena_extract.py --test
 ```
 
-All tests run locally with no Claude API calls, no clangd, and no external dependencies. Temp files are created and cleaned up automatically.
+All tests run locally with no LLM calls (no backend, no `claude` CLI), no clangd, and no external dependencies. Temp files are created and cleaned up automatically.
 
 ---
 
@@ -29,16 +29,16 @@ All tests run locally with no Claude API calls, no clangd, and no external depen
 
 ```
 Pipeline Script               Tests   Helpers Tested           How to Run
----------------------------   -----   ----------------------   ----------------------------------
-serena_extract.ps1              50    (self-contained)         .\serena_extract.ps1 -Test
-serena_extract.py               34    (self-contained)         uv run --python 3.12 serena_extract.py --test
-archgen_dirs.ps1                29    (self-contained)         .\archgen_dirs.ps1 -Test
-archgen.ps1                    193    archgen_worker.ps1       .\archgen.ps1 -Test
-archxref.ps1                   106    (self-contained)         .\archxref.ps1 -Test
-archgraph.ps1                  102    (self-contained)         .\archgraph.ps1 -Test
-arch_overview.ps1              118    (self-contained)         .\arch_overview.ps1 -Test
-archpass2_context.ps1           59    (self-contained)         .\archpass2_context.ps1 -Test
-archpass2.ps1                   81    archpass2_worker.ps1     .\archpass2.ps1 -Test
+---------------------------   -----   ----------------------   ----------------------------------------------------
+serena_extract.ps1              50    (self-contained)         .\llm_scripts\serena_extract.ps1 -Test
+serena_extract.py               34    (self-contained)         uv run --python 3.12 llm_scripts\serena_extract.py --test
+archgen_dirs.ps1                29    (self-contained)         .\llm_scripts\archgen_dirs.ps1 -Test
+archgen.ps1                    193    archgen_worker.ps1       .\llm_scripts\archgen.ps1 -Test
+archxref.ps1                   106    (self-contained)         .\llm_scripts\archxref.ps1 -Test
+archgraph.ps1                  102    (self-contained)         .\llm_scripts\archgraph.ps1 -Test
+arch_overview.ps1              118    (self-contained)         .\llm_scripts\arch_overview.ps1 -Test
+archpass2_context.ps1           59    (self-contained)         .\llm_scripts\archpass2_context.ps1 -Test
+archpass2.ps1                   81    archpass2_worker.ps1     .\llm_scripts\archpass2.ps1 -Test
 ---------------------------   -----
 TOTAL                          772
 ```
@@ -88,7 +88,7 @@ TOTAL                          772
 ### serena_extract.ps1 (50 tests)
 
 ```powershell
-.\serena_extract.ps1 -Test
+.\llm_scripts\serena_extract.ps1 -Test
 ```
 
 | Function | Tests | What's Verified |
@@ -103,7 +103,7 @@ TOTAL                          772
 ### serena_extract.py (34 tests)
 
 ```
-uv run --python 3.12 serena_extract.py --test
+uv run --python 3.12 llm_scripts\serena_extract.py --test
 ```
 
 | Test Class | Tests | What's Verified |
@@ -121,7 +121,7 @@ uv run --python 3.12 serena_extract.py --test
 ### archgen_dirs.ps1 (29 tests)
 
 ```powershell
-.\archgen_dirs.ps1 -Test
+.\llm_scripts\archgen_dirs.ps1 -Test
 ```
 
 | Function | Tests | What's Verified |
@@ -135,7 +135,7 @@ uv run --python 3.12 serena_extract.py --test
 ### archgen.ps1 (193 tests)
 
 ```powershell
-.\archgen.ps1 -Test
+.\llm_scripts\archgen.ps1 -Test
 ```
 
 | Function | Tests | What's Verified |
@@ -164,7 +164,7 @@ uv run --python 3.12 serena_extract.py --test
 ### archxref.ps1 (106 tests)
 
 ```powershell
-.\archxref.ps1 -Test
+.\llm_scripts\archxref.ps1 -Test
 ```
 
 | Function | Tests | What's Verified |
@@ -187,7 +187,7 @@ uv run --python 3.12 serena_extract.py --test
 ### archgraph.ps1 (102 tests)
 
 ```powershell
-.\archgraph.ps1 -Test
+.\llm_scripts\archgraph.ps1 -Test
 ```
 
 | Function | Tests | What's Verified |
@@ -204,7 +204,7 @@ uv run --python 3.12 serena_extract.py --test
 ### arch_overview.ps1 (118 tests)
 
 ```powershell
-.\arch_overview.ps1 -Test
+.\llm_scripts\arch_overview.ps1 -Test
 ```
 
 | Function | Tests | What's Verified |
@@ -225,7 +225,7 @@ uv run --python 3.12 serena_extract.py --test
 ### archpass2_context.ps1 (59 tests)
 
 ```powershell
-.\archpass2_context.ps1 -Test
+.\llm_scripts\archpass2_context.ps1 -Test
 ```
 
 | Function | Tests | What's Verified |
@@ -240,7 +240,7 @@ uv run --python 3.12 serena_extract.py --test
 ### archpass2.ps1 (81 tests)
 
 ```powershell
-.\archpass2.ps1 -Test
+.\llm_scripts\archpass2.ps1 -Test
 ```
 
 | Function | Tests | What's Verified |
@@ -285,7 +285,7 @@ This evaluates only the `function` definitions from the worker, making them call
 
 ## What's NOT Tested
 
-- **Claude API calls** — all Claude interactions are mocked away by testing only the pure functions that build payloads, parse responses, and detect errors. The actual `claude` CLI invocation is untestable without an API key.
+- **LLM calls** — the tests are backend-agnostic: they mock away whichever LLM backend is configured (ollama / vllm / claude) by exercising only the pure functions that build payloads, parse responses, and detect errors. The actual HTTP request (`Invoke-LocalLLM`) and the `claude` CLI invocation are not exercised — they require a live backend or an API key.
 - **clangd interactions** — `ClangdClient`, `extract_file()`, and `ExtractionWorker._run()` in `serena_extract.py` require a running clangd process with a built index. The pure functions that process clangd's output (symbol flattening, URI conversion, source trimming) are tested.
 - **Disk I/O side effects in main loops** — the main dispatch/drain loops in `archgen.ps1`, `archpass2.ps1`, and `arch_overview.ps1` are not tested end-to-end. The individual functions they call are tested.
 - **Rate-limit sleep/retry behavior** — `Wait-UntilResumeTime` and retry loops involve real `Start-Sleep` calls. The detection functions (`Test-RateLimit`, `Get-RateLimitResetTime`) that feed into them are tested.

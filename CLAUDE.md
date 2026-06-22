@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Architecture documentation toolkit for Unreal Engine 5.7.3 source code. Generates per-file and subsystem-level architecture docs using Claude CLI, with LSP-powered semantic analysis via clangd.
+Architecture documentation toolkit for large C++ codebases (ships tuned for Unreal Engine 5.x via the `unreal` preset). Generates per-file and subsystem-level architecture docs using a configurable LLM backend (local Ollama/vLLM via LLMConfig, or the Claude CLI), with LSP-powered semantic analysis via clangd.
 
-The repo root is a checkout of the **UnrealEngine source tree** (fork of EpicGames/UnrealEngine, branch `release`), but the work in this directory is the **toolkit** — the `arch*.ps1` + `serena_extract.*` scripts in `llm_scripts/`, the prompt templates in `llm_prompts/`, the toolkit docs in `llm_doc/`, and the deprecated `.sh` ports in `llm_Dep/`. Do not treat this as engine development; the UE source under `Engine/` is the *subject* the toolkit analyzes. (`README.md` is the upstream Epic readme and is not relevant to the toolkit.)
+This is the standalone **toolkit** repository — the `arch*.ps1` + `serena_extract.*` scripts in `llm_scripts/`, the prompt templates in `llm_prompts/`, the docs in `llm_doc/`, and the deprecated `.sh` ports in `llm_Dep/`. It is run from the root of whatever codebase you want to analyze (e.g. an Unreal Engine source tree); that target codebase is the *subject*, not part of this repo. `README.md` is the toolkit's own readme.
 
-**Repository:** `C:\Coding\rivaborn\Codebases\Epic_Games\UnrealEngine` (fork of EpicGames/UnrealEngine, branch `release`)
-**UE Version:** 5.7.3
+**Repository:** `github.com/rivaborn/LocalLLM_Code_Analysis`
+**Target example:** Unreal Engine 5.7.3 source (the `unreal` preset + bundled prompts target UE)
 **System:** Windows 11, 32 GB RAM
 
 The toolkit is **PowerShell-first**: the active scripts live in `llm_scripts/` (run them from the codebase root, e.g. `.\llm_scripts\archgen.ps1`), all reading `.env` from the codebase root. `*_worker.ps1` scripts are dispatched via `Start-Job` and must never be run directly. The old `.sh` ports are **deprecated** and live in `llm_Dep/` (they predate the local-LLM backend and assume the `claude` CLI only) — do not use or update them.
@@ -140,21 +140,21 @@ When `Get-Subsystems` encountered a directory with only 1 child (e.g., `Engine` 
 
 ## Token Optimizations
 
-28 optimizations documented across 4 files:
-- `Optimization.md` — v1: 8 implemented (skip trivial, shared headers, LSP trimming, targeted P2 context, tiered model, batch templates, compressed prompt, adaptive budget)
-- `Optimizations v2.md` — v2: 6 implemented (batch small files, preamble, schema pruning, delta P2, source elision, pattern cache)
-- `Optimizations v3.md` — v3: 7 implemented (max-tokens, dir-first analysis, LSP compression, JSON output, shared dir headers, incremental overview, classification)
-- `Optimizations v4.md` — v4: 1 implemented (prompt caching), 5 documented (diff-based, on-demand, cluster, sampling, templates)
+28 optimizations documented in `llm_doc/Optimizations.md`, grouped v1-v4:
+- v1: 8 (skip trivial, shared headers, LSP trimming, targeted P2 context, tiered model, batch templates, compressed prompt, adaptive budget)
+- v2: 6 (batch small files, preamble, schema pruning, delta P2, source elision, pattern cache)
+- v3: 7 (max-tokens, dir-first analysis, LSP compression, JSON output, shared dir headers, incremental overview, classification)
+- v4: 1 implemented (prompt caching), 5 documented (diff-based, on-demand, cluster, sampling, templates)
 
 Baseline ~250M tokens -> after v1-v3: ~12M tokens (95% reduction)
 
 ## Documentation Files
 
 Toolkit docs live in `llm_doc/`:
-- `llm_doc/SETUP.md` — Full setup guide (20 sections)
-- `llm_doc/Instructions.md` — CLI reference for every script (14 sections)
+- `llm_doc/SETUP.md` — Full setup guide
+- `llm_doc/Instructions.md` — Per-script CLI reference
 - `llm_doc/Quickstart.md` — Condensed reference
-- `llm_doc/SerenaFinal.md` — Complete technical reference (16 sections, 30 lessons learned)
+- `llm_doc/SerenaFinal.md` — Complete LSP-extraction technical reference
 - `llm_doc/FileReference.md` — Index of all files
 - `llm_doc/Optimizations.md` — Token optimization strategies
 

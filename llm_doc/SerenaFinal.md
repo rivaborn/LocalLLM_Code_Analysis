@@ -29,7 +29,7 @@ This document is the definitive summary of the entire multi-session effort to in
 
 The overarching objective was to build a multi-pass architecture documentation pipeline for large C++ game engine codebases, combining:
 
-- **Archgen** — A PowerShell toolchain that uses Claude CLI to generate per-file and subsystem-level architecture documentation.
+- **Archgen** — A PowerShell toolchain that uses the configured LLM backend (default: local Ollama `qwen3.6:27B`) to generate per-file and subsystem-level architecture documentation. The backend is selected by `LLM_BACKEND` in `.env`: `ollama` (default), `vllm` (gateway), or the legacy `claude` CLI.
 - **Serena** — An MCP server providing LSP-backed semantic code analysis (symbol lookup, cross-file references, call hierarchies) via clangd.
 - **Target codebases** — Unreal Engine 5.7.3 (massive, ~43K translation units) and Quake 2 Rerelease DLL (moderate, ~150 files).
 
@@ -43,7 +43,7 @@ The key value proposition: Serena's clangd integration provides **ground-truth**
 |-----------------------|------------------------------------------------------------------------------|
 | **OS**                | Windows 11 Home 10.0.26200                                                   |
 | **RAM**               | 32 GB                                                                        |
-| **Codebase location** | `C:\Coding\Epic_Games\UnrealEngine`                                          |
+| **Codebase location** | `C:\Coding\rivaborn\Codebases\Epic_Games\UnrealEngine`                       |
 | **Codebase size**     | 129 GB                                                                       |
 | **Repository**        | https://github.com/rivaborn/UnrealEngine (fork of EpicGames/UnrealEngine)    |
 | **Branch**            | `release`                                                                    |
@@ -58,20 +58,20 @@ The key value proposition: Serena's clangd integration provides **ground-truth**
 
 ## 3. Archgen Toolchain
 
-The archgen toolchain is a set of PowerShell scripts (with bash equivalents) that use Claude CLI to generate per-file architecture documentation for large game engine codebases.
+The archgen toolchain is a set of PowerShell scripts (in `llm_scripts/`) that use the configured LLM backend (default: local Ollama `qwen3.6:27B`; alternatives are the `vllm` gateway and the legacy `claude` CLI, selected via `LLM_BACKEND` in `.env`) to generate per-file architecture documentation for large game engine codebases. Scripts are run as `.\llm_scripts\<name>.ps1` from the codebase root; prompts live in `llm_prompts/`. (A handful of older bash ports exist in `llm_Dep/`, but they are deprecated, unmaintained, and incomplete — only 5 scripts were ever ported, and they predate the local-LLM backend. PowerShell is the only supported path.)
 
 ### 3.1 Pipeline Stages
 
-| Stage            | Script                   | Description                                                                                                                                                               | Claude Calls            | Parallelism                |
-|------------------|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------------------------|
-| **LSP Extract**  | `serena_extract.ps1`     | Adaptive parallel LSP extraction via clangd. Symbols, references, trimmed source. `-Compress` for LSP compression.                                                        | No (free)               | Multi-worker (auto-scales) |
-| **Dir Context**  | `archgen_dirs.ps1`       | Per-directory architectural overviews. Uses sonnet (tiered). Output: `architecture/.dir_context/<dir>.dir.md`.                                                             | Yes (sonnet, few calls) | Sequential                 |
-| **Pass 1**       | `archgen.ps1`            | Per-file docs with LSP + dir context + shared headers injection, trivial file skipping, adaptive output budget. Default haiku; auto-upgrades complex files to sonnet. New opt-in: `-MaxTokens`, `-JsonOutput`, `-Classify`. | Yes (haiku/sonnet)      | Parallel (`-Jobs N`)       |
-| **Cross-ref**    | `archxref.ps1`           | Function-to-file mappings, call graph edges, global state ownership, subsystem interfaces                                                                                 | No                      | Single-threaded, instant   |
-| **Graphs**       | `archgraph.ps1`          | Mermaid call graph + subsystem dependency diagrams                                                                                                                        | No                      | Single-threaded            |
-| **Overview**     | `arch_overview.ps1`      | Subsystem-level architecture overview. Auto-chunks for large codebases. Incremental by default (`overview_hashes.tsv`). `-Full` to force regeneration.                    | Yes (sonnet by default) | Sequential                 |
-| **P2 Context**   | `archpass2_context.ps1`  | Per-file targeted context extracts for Pass 2                                                                                                                             | No (free)               | Single-threaded, instant   |
-| **Pass 2**       | `archpass2.ps1`          | Selective re-analysis with scoring. Uses targeted context. Auto-upgrades complex files to sonnet (`TIERED_MODEL=1` default).                                              | Yes (haiku/sonnet)      | Parallel (`-Jobs N`)       |
+| Stage            | Script                              | Description                                                                                                                                                               | LLM Calls               | Parallelism                |
+|------------------|-------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------------------------|
+| **LSP Extract**  | `llm_scripts\serena_extract.ps1`    | Adaptive parallel LSP extraction via clangd. Symbols, references, trimmed source. `-Compress` for LSP compression.                                                        | No (free, clangd only)  | Multi-worker (auto-scales) |
+| **Dir Context**  | `llm_scripts\archgen_dirs.ps1`      | Per-directory architectural overviews. Uses tiered model. Output: `architecture/.dir_context/<dir>.dir.md`.                                                                | Yes (LLM, few calls)    | Sequential                 |
+| **Pass 1**       | `llm_scripts\archgen.ps1`           | Per-file docs with LSP + dir context + shared headers injection, trivial file skipping, adaptive output budget. Default model; auto-upgrades complex files to a stronger model. New opt-in: `-MaxTokens`, `-JsonOutput`, `-Classify`. | Yes (LLM)               | Parallel (`-Jobs N`)       |
+| **Cross-ref**    | `llm_scripts\archxref.ps1`          | Function-to-file mappings, call graph edges, global state ownership, subsystem interfaces                                                                                 | No                      | Single-threaded, instant   |
+| **Graphs**       | `llm_scripts\archgraph.ps1`         | Mermaid call graph + subsystem dependency diagrams                                                                                                                        | No                      | Single-threaded            |
+| **Overview**     | `llm_scripts\arch_overview.ps1`     | Subsystem-level architecture overview. Auto-chunks for large codebases. Incremental by default (`overview_hashes.tsv`). `-Full` to force regeneration.                    | Yes (LLM, by default)   | Sequential                 |
+| **P2 Context**   | `llm_scripts\archpass2_context.ps1` | Per-file targeted context extracts for Pass 2                                                                                                                             | No (free)               | Single-threaded, instant   |
+| **Pass 2**       | `llm_scripts\archpass2.ps1`         | Selective re-analysis with scoring. Uses targeted context. Auto-upgrades complex files to a stronger model (`TIERED_MODEL=1` default).                                     | Yes (LLM)               | Parallel (`-Jobs N`)       |
 
 ### 3.2 Key Features
 
@@ -80,14 +80,16 @@ The archgen toolchain is a set of PowerShell scripts (with bash equivalents) tha
 - **Header bundling:** Pass 1 bundles local `#include` headers as additional context (configurable max count). With `BUNDLE_HEADER_DOCS=1`, bundles the analyzed doc (~400 tokens) instead of raw source (~4000 tokens).
 - **Chunking:** Overview stage automatically chunks large codebases to stay within context limits.
 - **Adaptive parallel extraction:** LSP extraction auto-scales clangd instances based on available RAM, scaling up when resources free and down when tight.
-- **Token optimizations:** 8 built-in optimizations (trivial file skipping, adaptive output budget, LSP-guided source trimming, tiered model selection, header doc bundling, batch templated files, compressed prompt, targeted Pass 2 context) can reduce total API cost by up to ~72%. See `Optimization.md`.
+- **Token optimizations:** 8 built-in optimizations (trivial file skipping, adaptive output budget, LSP-guided source trimming, tiered model selection, header doc bundling, batch templated files, compressed prompt, targeted Pass 2 context) can reduce total LLM cost by up to ~72%. See `Optimization.md`.
 
 ### 3.3 Prompt Files
+
+Prompt templates live in `llm_prompts/`.
 
 | File                           | Purpose                                                                                                                                                                  |
 |--------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `file_doc_prompt.txt`          | Standard per-file analysis (~500 tokens) — file purpose, responsibilities, key types, key functions with signatures, global state, external dependencies, control flow    |
-| `file_doc_prompt_lsp.txt`      | LSP-enhanced — instructs Claude to use LSP context authoritatively for cross-references. Auto-selected when LSP context exists.                                           |
+| `file_doc_prompt_lsp.txt`      | LSP-enhanced — instructs the model to use LSP context authoritatively for cross-references. Auto-selected when LSP context exists.                                        |
 | `file_doc_prompt_compact.txt`  | Compressed prompt (~150 tokens) — same schema, terse format. Saves ~350 tokens per call.                                                                                 |
 | `file_doc_prompt_learn.txt`    | Learning-oriented variant — adds "Why This File Exists", prerequisites, design patterns, historical context, study questions                                              |
 | `file_doc_prompt_pass2.txt`    | Pass 2 enrichment — architectural role, cross-references (incoming/outgoing), design patterns and rationale, data flow, learning notes, potential issues                   |
@@ -153,9 +155,9 @@ The first generation attempt failed with: `Clang x64 must be installed in order 
 Example entry:
 ```json
 {
-    "file": "C:/Coding/Epic_Games/UnrealEngine/Engine/Intermediate/Build/Win64/x64/UnrealEditorGCD/Development/AIGraph/Module.AIGraph.gen.cpp",
+    "file": "C:/Coding/rivaborn/Codebases/Epic_Games/UnrealEngine/Engine/Intermediate/Build/Win64/x64/UnrealEditorGCD/Development/AIGraph/Module.AIGraph.gen.cpp",
     "command": "\"C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/Llvm/x64/bin/clang-cl.exe\" @\"../Intermediate/Build/Win64/x64/UnrealEditorGCD/Development/AIGraph/Module.AIGraph.gen.cpp.obj.rsp\"",
-    "directory": "C:/Coding/Epic_Games/UnrealEngine/Engine/Source",
+    "directory": "C:/Coding/rivaborn/Codebases/Epic_Games/UnrealEngine/Engine/Source",
     "output": "..."
 }
 ```
@@ -197,14 +199,14 @@ claude mcp add serena -- uvx --from "git+https://github.com/oraios/serena" ...
 **Solution:** Use the JSON registration form:
 
 ```powershell
-claude mcp add-json "serena" '{\"command\":\"uvx\",\"args\":[\"--python\",\"3.12\",\"--from\",\"git+https://github.com/oraios/serena\",\"serena\",\"start-mcp-server\",\"--context\",\"claude-code\",\"--project\",\"C:\\Coding\\Epic_Games\\UnrealEngine\"]}'
+claude mcp add-json "serena" '{\"command\":\"uvx\",\"args\":[\"--python\",\"3.12\",\"--from\",\"git+https://github.com/oraios/serena\",\"serena\",\"start-mcp-server\",\"--context\",\"claude-code\",\"--project\",\"C:\\Coding\\rivaborn\\Codebases\\Epic_Games\\UnrealEngine\"]}'
 ```
 
 **Key details in the registration:**
 - `--python 3.12` — Pins to stable Python, avoids 3.14 pre-release issues
 - `--from git+https://github.com/oraios/serena` — Installs from upstream repo
 - `--context claude-code` — Tells Serena it's running under Claude Code
-- `--project C:\Coding\Epic_Games\UnrealEngine` — Bypasses broken config file projects parsing (see Section 7.1)
+- `--project C:\Coding\rivaborn\Codebases\Epic_Games\UnrealEngine` — Bypasses broken config file projects parsing (see Section 7.1)
 
 ---
 
@@ -218,11 +220,11 @@ claude mcp add-json "serena" '{\"command\":\"uvx\",\"args\":[\"--python\",\"3.12
 # BROKEN — dict format
 projects:
   - name: UnrealEngine
-    path: "C:\\Coding\\Epic_Games\\UnrealEngine"
+    path: "C:\\Coding\\rivaborn\\Codebases\\Epic_Games\\UnrealEngine"
 
 # ALSO BROKEN — plain string format
 projects:
-  - "C:\\Coding\\Epic_Games\\UnrealEngine"
+  - "C:\\Coding\\rivaborn\\Codebases\\Epic_Games\\UnrealEngine"
 ```
 
 **Root cause:** A bug in Serena's `serena_config.py` (line 828/831) where `ruamel.yaml`'s `CommentedMap` objects are passed directly to `pathlib.Path()` without converting to string first. The bug exists in both the upstream `oraios/serena` repo and the `rivaborn/serena` fork. It reproduces on Python 3.12 and 3.14 — it is a Serena code bug, not a Python compatibility issue.
@@ -243,7 +245,7 @@ projects:
 
 ### 7.3 Per-Project Configuration
 
-**File:** `C:\Coding\Epic_Games\UnrealEngine\.serena\project.yml`
+**File:** `C:\Coding\rivaborn\Codebases\Epic_Games\UnrealEngine\.serena\project.yml`
 
 ```yaml
 name: UnrealEngine
@@ -306,7 +308,7 @@ The loss of `find_referencing_symbols` was critical — it was the primary reaso
 
 The solution was to enable background indexing with aggressive throttling, run it overnight, and let clangd build a persistent disk cache.
 
-**`.clangd` at repository root (`C:\Coding\Epic_Games\UnrealEngine\.clangd`):**
+**`.clangd` at repository root (`C:\Coding\rivaborn\Codebases\Epic_Games\UnrealEngine\.clangd`):**
 
 ```yaml
 Index:
@@ -460,24 +462,24 @@ If a Serena query is issued while clangd is still indexing, the query will time 
 
 ### 11.1 Integration Strategy (Revised — Serena-First)
 
-The key insight: LSP extraction costs zero Claude tokens (it talks directly to clangd via LSP protocol), so it should run **first** to enrich Pass 1 from the start. This produces better docs in one pass and reduces the need for Pass 2.
+The key insight: LSP extraction costs zero LLM tokens (it talks directly to clangd via LSP protocol), so it should run **first** to enrich Pass 1 from the start. This produces better docs in one pass and reduces the need for Pass 2.
 
 **Revised pipeline order (v3):**
 
-0. **`serena_extract.ps1`** — Direct LSP extraction via clangd. Zero Claude calls. Produces `.serena_context.txt` per file. New `-Compress` flag for LSP compression.
-0b. **`archgen_dirs.ps1` (NEW v3)** — Per-directory architectural overviews. Few Claude calls (sonnet). Output: `architecture/.dir_context/<dir>.dir.md`.
-1. **`archgen.ps1` (MODIFIED)** — Pass 1 now auto-detects and injects LSP context + directory overviews + shared headers. Pre-computes common includes (80%+ threshold) into `architecture/.dir_headers/`. New opt-in flags: `-MaxTokens`, `-JsonOutput`, `-Classify`.
-2. **`archxref.ps1`** — Unchanged.
-3. **`archgraph.ps1`** — Unchanged.
-4. **`arch_overview.ps1` (MODIFIED)** — Now incremental by default (tracks hashes in `overview_hashes.tsv`). New `-Full` flag to force regeneration.
-4b. **`archpass2_context.ps1`** — Unchanged.
-5. **`archpass2.ps1`** — Selective. `-Top N` limits to highest-value files. Supports `TIERED_MODEL`.
+0. **`llm_scripts\serena_extract.ps1`** — Direct LSP extraction via clangd. Zero LLM calls (clangd only). Produces `.serena_context.txt` per file. New `-Compress` flag for LSP compression.
+0b. **`llm_scripts\archgen_dirs.ps1` (NEW v3)** — Per-directory architectural overviews. Few LLM calls. Output: `architecture/.dir_context/<dir>.dir.md`.
+1. **`llm_scripts\archgen.ps1` (MODIFIED)** — Pass 1 now auto-detects and injects LSP context + directory overviews + shared headers. Pre-computes common includes (80%+ threshold) into `architecture/.dir_headers/`. New opt-in flags: `-MaxTokens`, `-JsonOutput`, `-Classify`.
+2. **`llm_scripts\archxref.ps1`** — Unchanged.
+3. **`llm_scripts\archgraph.ps1`** — Unchanged.
+4. **`llm_scripts\arch_overview.ps1` (MODIFIED)** — Now incremental by default (tracks hashes in `overview_hashes.tsv`). New `-Full` flag to force regeneration.
+4b. **`llm_scripts\archpass2_context.ps1`** — Unchanged.
+5. **`llm_scripts\archpass2.ps1`** — Selective. `-Top N` limits to highest-value files. Supports `TIERED_MODEL`.
 
 ### 11.2 Serena Extraction Script Design
 
-The extraction system consists of two files:
+The extraction system consists of two files (both in `llm_scripts/`):
 
-**`serena_extract.py`** — Python script that:
+**`llm_scripts/serena_extract.py`** — Python script that:
 - Spawns **multiple clangd processes** (adaptive parallel workers) and communicates via LSP JSON-RPC over stdio
 - Workers pull files from a **shared queue** — whoever finishes first grabs the next file
 - **RAM monitoring** every ~60 seconds: scales up when >10 GB free, scales down when <4 GB free
@@ -490,13 +492,13 @@ The extraction system consists of two files:
 - **Incremental support**: empty files (no symbols) are recorded in hash DB and skipped on rerun; failed files are NOT recorded and will retry automatically
 - ETA calculated from successfully completed files only (empty/failed excluded to avoid inflating the rate)
 - Caps references at 20 per symbol, 10-second timeout per reference query
-- **Zero Claude API calls. Zero tokens.**
+- **Zero LLM calls. Zero tokens.** (This applies to Step 0 / `serena_extract` only — it talks straight to clangd. The downstream LLM stages — `archgen_dirs`, `archgen`, `arch_overview`, `archpass2` — do call the configured LLM backend.)
 
-**`serena_extract.ps1`** — PowerShell wrapper that:
+**`llm_scripts/serena_extract.ps1`** — PowerShell wrapper that:
 - Reads `.env` for preset/include/exclude patterns
 - Verifies prerequisites (compile_commands.json, clangd index)
 - Passes `-Workers`, `-SkipRefs`, `-MinFreeRAM`, `-RAMPerWorker` flags through
-- Invokes `uv run --python 3.12 serena_extract.py` with the right arguments
+- Invokes `uv run --python 3.12 llm_scripts\serena_extract.py` with the right arguments
 
 **Progress display** (single-line, overwrites in place via `[Console]::Write()`):
 ```
@@ -578,7 +580,7 @@ The `-SkipRefs` flag has minimal impact on speed (references take <0.1s per file
 **Changes:**
 - New parameters: `$serenaContextDir`, `$bundleHeaderDocs`, `$outputBudget`
 - Loads `.serena_context.txt` if available for the current file
-- Injects LSP context into the Claude payload at stages 0 and 1
+- Injects LSP context into the LLM payload at stages 0 and 1
 - Uses **LSP-trimmed source** for large files instead of blunt head+tail truncation
 - Bundles header `.md` docs instead of raw source when `BUNDLE_HEADER_DOCS=1`
 - Appends **adaptive output budget** instruction to payload
@@ -604,13 +606,13 @@ The `-SkipRefs` flag has minimal impact on speed (references take <0.1s per file
 
 ### 11.5 New Prompts
 
-**`file_doc_prompt_lsp.txt`** — Enhanced variant that instructs Claude to use LSP context authoritatively for cross-references, populate "Called by" fields, and use specific file locations from LSP data. ~1200-1500 token output.
+**`file_doc_prompt_lsp.txt`** — Enhanced variant that instructs the model to use LSP context authoritatively for cross-references, populate "Called by" fields, and use specific file locations from LSP data. ~1200-1500 token output.
 
 **`file_doc_prompt_compact.txt`** — Compressed prompt (~150 tokens vs ~500). Same output schema in terse format. References `OUTPUT_BUDGET` appended by the worker. Saves ~7M input tokens over 20K files.
 
 ### 11.6 New: archpass2_context.ps1 — Targeted Pass 2 Context
 
-Instead of injecting the same 200+300 line global context blobs into every Pass 2 call, this script pre-extracts **only the relevant portions** per file. Zero Claude calls, runs in seconds.
+Instead of injecting the same 200+300 line global context blobs into every Pass 2 call, this script pre-extracts **only the relevant portions** per file. Zero LLM calls, runs in seconds.
 
 For each file, it extracts:
 - Architecture overview paragraphs matching the file's subsystem
@@ -635,34 +637,34 @@ Files with high incoming reference counts are "hub" files (called by many others
 ### 11.8 Complete Pipeline (Unreal Engine)
 
 ```powershell
-cd C:\Coding\Epic_Games\UnrealEngine
+cd C:\Coding\rivaborn\Codebases\Epic_Games\UnrealEngine
 
-# 0. LSP extraction (zero Claude calls, adaptive parallel clangd)
-.\serena_extract.ps1 -Preset unreal -Workers 3
+# 0. LSP extraction (zero LLM calls, clangd only, adaptive parallel)
+.\llm_scripts\serena_extract.ps1 -Preset unreal -Workers 3
 
-# 0b. Directory-level overviews (few Claude calls, sonnet)
-.\archgen_dirs.ps1 -Preset unreal
+# 0b. Directory-level overviews (few LLM calls)
+.\llm_scripts\archgen_dirs.ps1 -Preset unreal
 
 # 1. Pass 1: per-file docs with LSP + dir context + shared headers + all optimizations
-.\archgen.ps1 -Preset unreal -Jobs 8
+.\llm_scripts\archgen.ps1 -Preset unreal -Jobs 8
 
-# 2. Cross-reference index (no Claude calls, instant)
-.\archxref.ps1
+# 2. Cross-reference index (no LLM calls, instant)
+.\llm_scripts\archxref.ps1
 
-# 3. Call graph diagrams (no Claude calls, instant)
-.\archgraph.ps1
+# 3. Call graph diagrams (no LLM calls, instant)
+.\llm_scripts\archgraph.ps1
 
 # 4. Architecture overview (incremental by default, chunked for UE)
-.\arch_overview.ps1 -Preset unreal
+.\llm_scripts\arch_overview.ps1 -Preset unreal
 
 # 4b. Targeted per-file context for Pass 2 (instant, free)
-.\archpass2_context.ps1
+.\llm_scripts\archpass2_context.ps1
 
 # 5. Pass 2: selective re-analysis of highest-value files only
-.\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500
+.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500
 ```
 
-Step 0 is free (zero tokens, ~9 hours at 3 workers for full UE). Step 0b generates directory overviews used as context in Step 1 (few sonnet calls). Step 1 auto-skips trivial files and uses LSP + dir context + shared headers. Steps 2-4b are free. Step 4 is incremental (unchanged subsystems skip on re-run). Step 5 processes only the top 500 files with targeted context — a ~93% reduction in Pass 2 calls and ~50% reduction in per-call input tokens.
+Step 0 is free (zero LLM tokens, clangd only, ~9 hours at 3 workers for full UE). Step 0b generates directory overviews used as context in Step 1 (few LLM calls). Step 1 auto-skips trivial files and uses LSP + dir context + shared headers. Steps 2-4b are free. Step 4 is incremental (unchanged subsystems skip on re-run). Step 5 processes only the top 500 files with targeted context — a ~93% reduction in Pass 2 calls and ~50% reduction in per-call input tokens. (All LLM steps — 0b, 1, 4, 5 — use the configured `LLM_BACKEND`, default local Ollama `qwen3.6:27B`.)
 
 ---
 
@@ -694,11 +696,11 @@ Step 0 is free (zero tokens, ~9 hours at 3 workers for full UE). Step 0b generat
 
 ```powershell
 cd <quake2-rerelease-dll repo root>
-.\archgen.ps1 -TargetDir rerelease -Preset quake -Jobs 8
-.\archxref.ps1
-.\archgraph.ps1
-.\arch_overview.ps1 -Preset quake
-.\archpass2.ps1 -Preset quake -Jobs 8
+.\llm_scripts\archgen.ps1 -TargetDir rerelease -Preset quake -Jobs 8
+.\llm_scripts\archxref.ps1
+.\llm_scripts\archgraph.ps1
+.\llm_scripts\arch_overview.ps1 -Preset quake
+.\llm_scripts\archpass2.ps1 -Preset quake -Jobs 8
 ```
 
 ---
@@ -758,7 +760,7 @@ read_only: true
 ### 13.3 Claude Code MCP Registration (JSON)
 
 ```powershell
-claude mcp add-json "serena" '{\"command\":\"uvx\",\"args\":[\"--python\",\"3.12\",\"--from\",\"git+https://github.com/oraios/serena\",\"serena\",\"start-mcp-server\",\"--context\",\"claude-code\",\"--project\",\"C:\\Coding\\Epic_Games\\UnrealEngine\"]}'
+claude mcp add-json "serena" '{\"command\":\"uvx\",\"args\":[\"--python\",\"3.12\",\"--from\",\"git+https://github.com/oraios/serena\",\"serena\",\"start-mcp-server\",\"--context\",\"claude-code\",\"--project\",\"C:\\Coding\\rivaborn\\Codebases\\Epic_Games\\UnrealEngine\"]}'
 ```
 
 ### 13.4 clangd RAM Monitor (PowerShell)
@@ -796,7 +798,7 @@ while ($true) {
 | `archpass2.ps1` scoring tuning                  | **Pending**               | Low    | `-Top` threshold and scoring weights may need adjustment after first real run                                                                                                                     |
 | Token optimization tuning                       | **Pending**               | Low    | `TIERED_MODEL`, `BUNDLE_HEADER_DOCS`, `BATCH_TEMPLATED` settings implemented but not yet tuned against real output quality                                                                       |
 | v3 opt-in features tuning                       | **Pending**               | Low    | `USE_MAX_TOKENS`, `JSON_OUTPUT`, `CLASSIFY_FILES` implemented but not yet validated at scale                                                                                                     |
-| Rate limits during extraction                   | **No longer applicable**  | None   | Extraction talks directly to clangd, bypassing Claude entirely                                                                                                                                   |
+| Rate limits during extraction                   | **No longer applicable**  | None   | Extraction (Step 0) talks directly to clangd, bypassing the LLM entirely                                                                                                                          |
 
 ---
 
@@ -838,7 +840,7 @@ while ($true) {
 
 ### 15.4 Token Optimization
 
-15. **Skipping generated files is the single biggest win.** UE has ~30-40% generated/trivial files (`.generated.h`, `.gen.cpp`, `Module.*.cpp`). Writing stub docs instead of Claude calls saves thousands of API calls.
+15. **Skipping generated files is the single biggest win.** UE has ~30-40% generated/trivial files (`.generated.h`, `.gen.cpp`, `Module.*.cpp`). Writing stub docs instead of LLM calls saves thousands of inference calls.
 
 16. **Adaptive output budget prevents wasted tokens on small files.** A 30-line header doesn't need 1000 tokens of analysis. Setting per-file budgets (~200 to ~1200 tokens based on size) reduces total output by 10-20%.
 
@@ -864,11 +866,11 @@ while ($true) {
 
 ### 15.6 v3 Optimizations
 
-26. **Directory-level overviews provide valuable architectural context for Pass 1.** Having `archgen_dirs.ps1` generate per-directory overviews before Pass 1 means each file's Claude call has context about the directory's purpose and structure. Few sonnet calls for significant quality uplift.
+26. **Directory-level overviews provide valuable architectural context for Pass 1.** Having `archgen_dirs.ps1` generate per-directory overviews before Pass 1 means each file's LLM call has context about the directory's purpose and structure. Few LLM calls for significant quality uplift.
 
 27. **Shared directory headers reduce redundant bundling.** Pre-computing common includes (80%+ threshold) per directory means workers load shared headers once rather than re-bundling the same headers for every file. Saves both input tokens and processing time.
 
-28. **Incremental overview saves significant time on re-runs.** Tracking subsystem doc hashes in `overview_hashes.tsv` means unchanged subsystems skip entirely on re-run. Only modified subsystems get regenerated, dramatically reducing Claude calls for iterative development.
+28. **Incremental overview saves significant time on re-runs.** Tracking subsystem doc hashes in `overview_hashes.tsv` means unchanged subsystems skip entirely on re-run. Only modified subsystems get regenerated, dramatically reducing LLM calls for iterative development.
 
 29. **Two-phase classification is more accurate than pattern matching for trivial file detection.** An ultra-cheap haiku call classifying files as ANALYZE or STUB catches trivial files that string patterns miss, while avoiding false positives on files that look generated but contain real logic.
 
@@ -905,7 +907,7 @@ uv python install 3.12
 .\Engine\Build\BatchFiles\RunUBT.bat UnrealEditor Win64 Development -Mode=GenerateClangDatabase -engine -progress
 
 # Register Serena MCP server
-claude mcp add-json "serena" '{\"command\":\"uvx\",\"args\":[\"--python\",\"3.12\",\"--from\",\"git+https://github.com/oraios/serena\",\"serena\",\"start-mcp-server\",\"--context\",\"claude-code\",\"--project\",\"C:\\Coding\\Epic_Games\\UnrealEngine\"]}'
+claude mcp add-json "serena" '{\"command\":\"uvx\",\"args\":[\"--python\",\"3.12\",\"--from\",\"git+https://github.com/oraios/serena\",\"serena\",\"start-mcp-server\",\"--context\",\"claude-code\",\"--project\",\"C:\\Coding\\rivaborn\\Codebases\\Epic_Games\\UnrealEngine\"]}'
 ```
 
 ### Start Indexing (First Time or After Cache Clear)
@@ -929,20 +931,20 @@ claude
 ### Full Archgen Pipeline (Serena-First, All Optimizations)
 
 ```powershell
-.\serena_extract.ps1 -Preset unreal -Workers 3    # LSP extraction (free, adaptive parallel)
-.\archgen_dirs.ps1 -Preset unreal                  # Dir-level overviews (few Claude calls)
-.\archgen.ps1 -Preset unreal -Jobs 8               # Pass 1 (LSP + dir context + shared headers)
-.\archxref.ps1                                      # Cross-references
-.\archgraph.ps1                                     # Call graph diagrams
-.\arch_overview.ps1 -Preset unreal                  # Overview (incremental by default)
-.\archpass2_context.ps1                              # Targeted Pass 2 context (free)
-.\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500     # Pass 2 (selective, targeted context)
+.\llm_scripts\serena_extract.ps1 -Preset unreal -Workers 3    # LSP extraction (free, clangd only, adaptive parallel)
+.\llm_scripts\archgen_dirs.ps1 -Preset unreal                  # Dir-level overviews (few LLM calls)
+.\llm_scripts\archgen.ps1 -Preset unreal -Jobs 8               # Pass 1 (LSP + dir context + shared headers)
+.\llm_scripts\archxref.ps1                                      # Cross-references
+.\llm_scripts\archgraph.ps1                                     # Call graph diagrams
+.\llm_scripts\arch_overview.ps1 -Preset unreal                  # Overview (incremental by default)
+.\llm_scripts\archpass2_context.ps1                              # Targeted Pass 2 context (free)
+.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500     # Pass 2 (selective, targeted context)
 ```
 
 ### Fast Extraction (Symbols Only)
 
 ```powershell
-.\serena_extract.ps1 -Preset unreal -Workers 3 -SkipRefs
+.\llm_scripts\serena_extract.ps1 -Preset unreal -Workers 3 -SkipRefs
 ```
 
 ### Monitor clangd During Extraction

@@ -16,8 +16,8 @@ Complete command-line reference for every script in the toolkit. Each section co
 8. [arch_overview.ps1 — Architecture Overview](#8-arch_overviewps1--architecture-overview)
 9. [archpass2_context.ps1 — Targeted Pass 2 Context](#9-archpass2_contextps1--targeted-pass-2-context)
 10. [archpass2.ps1 — Pass 2: Selective Re-Analysis](#10-archpass2ps1--pass-2-selective-re-analysis)
-11. [Bash Equivalents](#11-bash-equivalents)
-12. [Claude Model Usage](#12-claude-model-usage) — Models by script, tiered quality impact, per-script recommendations
+11. [Bash Ports (Deprecated)](#11-bash-ports-deprecated)
+12. [Model / Backend Usage](#12-model--backend-usage) — Backends, models by script, tiered quality impact, per-script recommendations
 13. [.env Configuration Variables](#13-env-configuration-variables)
 14. [Presets](#14-presets)
 15. [Common Workflows](#15-common-workflows)
@@ -50,13 +50,14 @@ Extracts symbol overviews and cross-file references from clangd using adaptive p
 ### Syntax
 
 ```
-.\serena_extract.ps1
+.\llm_scripts\serena_extract.ps1
     [-TargetDir <string>]
     [-Preset <string>]
     [-Jobs <int>]
     [-Workers <int>]
     [-Force]
     [-SkipRefs]
+    [-Compress]
     [-MinFreeRAM <double>]
     [-RAMPerWorker <double>]
     [-EnvFile <string>]
@@ -68,7 +69,7 @@ Extracts symbol overviews and cross-file references from clangd using adaptive p
 | Parameter       | Type   | Default    | Description                                                                                              |
 |-----------------|--------|------------|----------------------------------------------------------------------------------------------------------|
 | `-TargetDir`    | string | `"."`      | Subdirectory to scan (relative to repo root). Use `"."` for entire repo.                                 |
-| `-Preset`       | string | `""`       | Engine preset for include/exclude patterns. See [Presets](#12-presets). Falls back to `PRESET` in `.env`. |
+| `-Preset`       | string | `""`       | Engine preset for include/exclude patterns. See [Presets](#14-presets). Falls back to `PRESET` in `.env`. |
 | `-Jobs`         | int    | `2`        | clangd `-j` flag: number of internal **threads** each clangd process uses for background work.           |
 | `-Workers`      | int    | `0`        | Number of clangd **processes** (each is a separate instance with its own LSP connection). `0` = auto-detect based on free RAM. |
 | `-Force`        | switch | off        | Re-extract all files even if `.serena_context.txt` already exists and source is unchanged.                |
@@ -174,28 +175,31 @@ architecture/.serena_context/.state/hashes.tsv
 
 ```powershell
 # Auto-detect workers based on free RAM
-.\serena_extract.ps1 -Preset unreal
+.\llm_scripts\serena_extract.ps1 -Preset unreal
 
 # Explicit 3 workers
-.\serena_extract.ps1 -Preset unreal -Workers 3
+.\llm_scripts\serena_extract.ps1 -Preset unreal -Workers 3
 
 # Fast mode: symbols only, no reference queries
-.\serena_extract.ps1 -Preset unreal -SkipRefs
+.\llm_scripts\serena_extract.ps1 -Preset unreal -SkipRefs
+
+# Compressed LSP output (collapse classes, keep top-10 functions)
+.\llm_scripts\serena_extract.ps1 -Preset unreal -Compress
 
 # Max speed: 3 workers, skip refs
-.\serena_extract.ps1 -Preset unreal -Workers 3 -SkipRefs
+.\llm_scripts\serena_extract.ps1 -Preset unreal -Workers 3 -SkipRefs
 
 # Single subsystem
-.\serena_extract.ps1 -TargetDir Engine\Source\Runtime\Core -Preset unreal
+.\llm_scripts\serena_extract.ps1 -TargetDir Engine\Source\Runtime\Core -Preset unreal
 
 # Force re-extraction of everything
-.\serena_extract.ps1 -Preset unreal -Force
+.\llm_scripts\serena_extract.ps1 -Preset unreal -Force
 
 # Tune RAM thresholds (tight system)
-.\serena_extract.ps1 -Preset unreal -Workers 2 -MinFreeRAM 4 -RAMPerWorker 4
+.\llm_scripts\serena_extract.ps1 -Preset unreal -Workers 2 -MinFreeRAM 4 -RAMPerWorker 4
 
 # Use a specific clangd binary
-.\serena_extract.ps1 -Preset unreal -ClangdPath "C:\Program Files\LLVM\bin\clangd.exe"
+.\llm_scripts\serena_extract.ps1 -Preset unreal -ClangdPath "C:\Program Files\LLVM\bin\clangd.exe"
 ```
 
 ### Workers vs Jobs
@@ -294,7 +298,7 @@ Generates per-directory architectural overviews before Pass 1. Uses sonnet (tier
 ### Syntax
 
 ```
-.\archgen_dirs.ps1
+.\llm_scripts\archgen_dirs.ps1
     [-TargetDir <string>]
     [-Preset <string>]
     [-EnvFile <string>]
@@ -318,10 +322,10 @@ architecture/.dir_context/<dir>.dir.md
 
 ```powershell
 # Generate directory overviews for full codebase
-.\archgen_dirs.ps1 -Preset unreal
+.\llm_scripts\archgen_dirs.ps1 -Preset unreal
 
 # Single subsystem
-.\archgen_dirs.ps1 -TargetDir Engine\Source\Runtime\Core -Preset unreal
+.\llm_scripts\archgen_dirs.ps1 -TargetDir Engine\Source\Runtime\Core -Preset unreal
 ```
 
 ---
@@ -333,7 +337,7 @@ Generates one structured `.md` doc per source file using Claude CLI. Automatical
 ### Syntax
 
 ```
-.\archgen.ps1
+.\llm_scripts\archgen.ps1
     [-TargetDir <string>]
     [-Preset <string>]
     [-Claude1]
@@ -341,13 +345,16 @@ Generates one structured `.md` doc per source file using Claude CLI. Automatical
     [-NoHeaders]
     [-Jobs <int>]
     [-EnvFile <string>]
-    [-MaxTokens]
-    [-JsonOutput]
-    [-Classify]
-    [-ElideSource]
-    [-NoBatch]
-    [-NoPreamble]
+    [-MaxTokens <string>]
+    [-JsonOutput <string>]
+    [-CompressLSP <string>]
+    [-Classify <string>]
+    [-ElideSource <string>]
+    [-NoBatch <string>]
+    [-NoPreamble <string>]
 ```
+
+> **Note on the optimization flags.** `-MaxTokens`, `-JsonOutput`, `-CompressLSP`, `-Classify`, `-ElideSource`, `-NoBatch`, and `-NoPreamble` are declared as `[string]` parameters (default `""`), **not** `[switch]` — this works around a PowerShell parameter-binding error. Enable each by passing a non-empty value, e.g. `-MaxTokens "1"` or `-Classify "1"`. Passing the flag with no value does **not** enable it. Each also has an `.env` equivalent (see table).
 
 ### Parameters
 
@@ -360,12 +367,13 @@ Generates one structured `.md` doc per source file using Claude CLI. Automatical
 | `-NoHeaders`   | switch | off             | Disable header bundling. Overrides `BUNDLE_HEADERS` in `.env`.                                             |
 | `-Jobs`        | int    | 0 (from `.env`) | Parallel worker count. 0 means use `JOBS` from `.env` (default 2).                                         |
 | `-EnvFile`     | string | `".env"`        | Path to environment configuration file.                                                                    |
-| `-MaxTokens`   | switch | off             | Hard output cap: maps adaptive budget to `--max-tokens` on Claude CLI. Also via `USE_MAX_TOKENS=1`.        |
-| `-JsonOutput`  | switch | off             | Switches output format to JSON. Also via `JSON_OUTPUT=1`.                                                  |
-| `-Classify`    | switch | off             | Two-phase classification: ultra-cheap haiku call classifies files as ANALYZE or STUB. Also via `CLASSIFY_FILES=1`. |
-| `-ElideSource` | switch | off             | Elide source from payload.                                                                                 |
-| `-NoBatch`     | switch | off             | Disable batch templated files.                                                                             |
-| `-NoPreamble`  | switch | off             | Disable preamble in output.                                                                                |
+| `-MaxTokens`   | string | `""`            | Pass a value (e.g. `"1"`) to enable. Hard output cap: maps adaptive budget to `--max-tokens` (Claude backend). Also via `USE_MAX_TOKENS=1`. |
+| `-JsonOutput`  | string | `""`            | Pass a value to enable. Switches output format to JSON. Also via `JSON_OUTPUT=1`.                          |
+| `-CompressLSP` | string | `""`            | Pass a value to enable. Compresses injected LSP context to save tokens. Also via `COMPRESS_LSP=1`.         |
+| `-Classify`    | string | `""`            | Pass a value to enable. Two-phase classification: ultra-cheap classifier call labels files ANALYZE or STUB. Also via `CLASSIFY_FILES=1`. |
+| `-ElideSource` | string | `""`            | Pass a value to enable. Elide source from payload.                                                         |
+| `-NoBatch`     | string | `""`            | Pass a value to enable. Disable batch templated files.                                                     |
+| `-NoPreamble`  | string | `""`            | Pass a value to enable. Disable preamble in output.                                                        |
 
 ### Automatic Behaviors
 
@@ -412,34 +420,34 @@ architecture/.archgen_state/fatal.msg              — Fatal error message
 
 ```powershell
 # Full codebase with preset
-.\archgen.ps1 -Preset unreal -Jobs 8
+.\llm_scripts\archgen.ps1 -Preset unreal -Jobs 8
 
 # Single subsystem
-.\archgen.ps1 -TargetDir Engine\Source\Runtime\Renderer -Preset unreal -Jobs 4
+.\llm_scripts\archgen.ps1 -TargetDir Engine\Source\Runtime\Renderer -Preset unreal -Jobs 4
 
 # Without header bundling
-.\archgen.ps1 -Preset unreal -NoHeaders
+.\llm_scripts\archgen.ps1 -Preset unreal -NoHeaders
 
 # Using account 1
-.\archgen.ps1 -Preset unreal -Claude1
+.\llm_scripts\archgen.ps1 -Preset unreal -Claude1
 
 # Clean start (removes all previous output)
-.\archgen.ps1 -Preset unreal -Clean
+.\llm_scripts\archgen.ps1 -Preset unreal -Clean
 
 # Custom .env file
-.\archgen.ps1 -Preset unreal -EnvFile .env.production
+.\llm_scripts\archgen.ps1 -Preset unreal -EnvFile .env.production
 ```
 
 ---
 
-## 5. archxref.ps1 — Cross-Reference Index
+## 6. archxref.ps1 — Cross-Reference Index
 
 Parses Pass 1 docs and builds a cross-reference index. No Claude calls. Runs in seconds.
 
 ### Syntax
 
 ```
-.\archxref.ps1
+.\llm_scripts\archxref.ps1
     [-TargetDir <string>]
     [-EnvFile <string>]
 ```
@@ -463,22 +471,22 @@ Contains: function-to-file map, call graph table, reverse call map, global state
 
 ```powershell
 # Build index from all Pass 1 docs
-.\archxref.ps1
+.\llm_scripts\archxref.ps1
 
 # Build index for a specific subsystem
-.\archxref.ps1 -TargetDir Engine\Source\Runtime\Renderer
+.\llm_scripts\archxref.ps1 -TargetDir Engine\Source\Runtime\Renderer
 ```
 
 ---
 
-## 6. archgraph.ps1 — Call Graph Diagrams
+## 7. archgraph.ps1 — Call Graph Diagrams
 
 Extracts call edges from Pass 1 docs and generates Mermaid diagrams. No Claude calls.
 
 ### Syntax
 
 ```
-.\archgraph.ps1
+.\llm_scripts\archgraph.ps1
     [-TargetDir <string>]
     [-MaxCallEdges <int>]
     [-MinCallSignificance <int>]
@@ -506,25 +514,25 @@ architecture/callgraph.md          — Both diagrams in markdown with embedded M
 
 ```powershell
 # Default settings
-.\archgraph.ps1
+.\llm_scripts\archgraph.ps1
 
 # More edges, lower threshold
-.\archgraph.ps1 -MaxCallEdges 300 -MinCallSignificance 1
+.\llm_scripts\archgraph.ps1 -MaxCallEdges 300 -MinCallSignificance 1
 
 # Only renderer subsystem
-.\archgraph.ps1 -TargetDir Engine\Source\Runtime\Renderer
+.\llm_scripts\archgraph.ps1 -TargetDir Engine\Source\Runtime\Renderer
 ```
 
 ---
 
-## 7. arch_overview.ps1 — Architecture Overview
+## 8. arch_overview.ps1 — Architecture Overview
 
 Synthesizes Pass 1 docs into a subsystem-level architecture overview using Claude.
 
 ### Syntax
 
 ```
-.\arch_overview.ps1
+.\llm_scripts\arch_overview.ps1
     [-TargetDir <string>]
     [-Chunked]
     [-Single]
@@ -572,28 +580,28 @@ architecture/diagram_data.md                    — Extracted signal data for sy
 
 ```powershell
 # Auto-detect single vs chunked
-.\arch_overview.ps1 -Preset unreal
+.\llm_scripts\arch_overview.ps1 -Preset unreal
 
 # Force chunked mode
-.\arch_overview.ps1 -Preset unreal -Chunked
+.\llm_scripts\arch_overview.ps1 -Preset unreal -Chunked
 
 # Single subsystem overview
-.\arch_overview.ps1 -TargetDir Engine\Source\Runtime\Renderer
+.\llm_scripts\arch_overview.ps1 -TargetDir Engine\Source\Runtime\Renderer
 
 # Clean and regenerate
-.\arch_overview.ps1 -Preset unreal -Clean
+.\llm_scripts\arch_overview.ps1 -Preset unreal -Clean
 ```
 
 ---
 
-## 8. archpass2_context.ps1 — Targeted Pass 2 Context
+## 9. archpass2_context.ps1 — Targeted Pass 2 Context
 
 Builds per-file targeted context extracts for Pass 2. Extracts only the relevant architecture overview and xref entries for each file. Zero Claude calls.
 
 ### Syntax
 
 ```
-.\archpass2_context.ps1
+.\llm_scripts\archpass2_context.ps1
     [-TargetDir <string>]
     [-EnvFile <string>]
 ```
@@ -629,22 +637,22 @@ Replaces the blunt 200+300 line global context with 30-80 lines of targeted cont
 
 ```powershell
 # Build targeted context for all files
-.\archpass2_context.ps1
+.\llm_scripts\archpass2_context.ps1
 
 # Build for a specific subsystem
-.\archpass2_context.ps1 -TargetDir Engine\Source\Runtime\Renderer
+.\llm_scripts\archpass2_context.ps1 -TargetDir Engine\Source\Runtime\Renderer
 ```
 
 ---
 
-## 9. archpass2.ps1 — Pass 2: Selective Re-Analysis
+## 10. archpass2.ps1 — Pass 2: Selective Re-Analysis
 
 Re-analyzes source files with architecture context injected. Supports selective processing to target only the highest-value files.
 
 ### Syntax
 
 ```
-.\archpass2.ps1
+.\llm_scripts\archpass2.ps1
     [-TargetDir <string>]
     [-Claude1]
     [-Clean]
@@ -653,6 +661,7 @@ Re-analyzes source files with architecture context injected. Supports selective 
     [-EnvFile <string>]
     [-Top <int>]
     [-ScoreOnly]
+    [-Delta]
 ```
 
 ### Parameters
@@ -666,7 +675,8 @@ Re-analyzes source files with architecture context injected. Supports selective 
 | `-Jobs`      | int    | 0 (from `.env`) | Parallel worker count. 0 means use `JOBS` from `.env`.                                                                 |
 | `-EnvFile`   | string | `".env"`         | Path to environment configuration file.                                                                                |
 | `-Top`       | int    | `0`              | Only process the N highest-scoring files. 0 means process all files (original behavior).                               |
-| `-ScoreOnly` | switch | off              | Print file scores and exit without running any Claude calls. Use with `-Top` to preview which files would be selected. |
+| `-ScoreOnly` | switch | off              | Print file scores and exit without running any model calls. Use with `-Top` to preview which files would be selected.  |
+| `-Delta`     | switch | off              | Delta-only mode: emit only new insights beyond the Pass 1 doc rather than a full re-written document. Saves tokens.    |
 
 ### Scoring Formula (with -Top)
 
@@ -711,52 +721,51 @@ architecture/.pass2_state/ratelimit_resume.txt     — Shared rate-limit pause
 
 ```powershell
 # Process all files (original behavior)
-.\archpass2.ps1 -Preset unreal -Jobs 8
+.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8
 
 # Selective: top 500 highest-scoring files
-.\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500
+.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500
 
 # Preview scores without running
-.\archpass2.ps1 -Preset unreal -Top 500 -ScoreOnly
+.\llm_scripts\archpass2.ps1 -Preset unreal -Top 500 -ScoreOnly
 
 # Manual file selection
-.\archpass2.ps1 -Only "Engine/Source/Runtime/Engine/Private/Actor.cpp,Engine/Source/Runtime/CoreUObject/Private/UObject/UObjectBase.cpp"
+.\llm_scripts\archpass2.ps1 -Only "Engine/Source/Runtime/Engine/Private/Actor.cpp,Engine/Source/Runtime/CoreUObject/Private/UObject/UObjectBase.cpp"
 
 # Specific subdirectory
-.\archpass2.ps1 -TargetDir Engine\Source\Runtime\Renderer -Jobs 4
+.\llm_scripts\archpass2.ps1 -TargetDir Engine\Source\Runtime\Renderer -Jobs 4
 
 # Clean Pass 2 output and regenerate
-.\archpass2.ps1 -Preset unreal -Clean -Jobs 8
+.\llm_scripts\archpass2.ps1 -Preset unreal -Clean -Jobs 8
 
 # Using account 1
-.\archpass2.ps1 -Preset unreal -Claude1 -Jobs 8
+.\llm_scripts\archpass2.ps1 -Preset unreal -Claude1 -Jobs 8
 ```
 
 ---
 
-## 10. Bash Equivalents
+## 11. Bash Ports (Deprecated)
 
-For Linux, macOS, and WSL environments, bash equivalents exist for the core pipeline scripts. They use the same `.env` file and produce the same output format.
+**The bash (`.sh`) ports are deprecated and unmaintained. Use the PowerShell scripts on all platforms (Windows, Linux, macOS, WSL) via `pwsh`.**
 
-| PowerShell          | Bash               | Notes                                                         |
-|---------------------|--------------------|---------------------------------------------------------------|
-| `archgen.ps1`       | `archgen.sh`       | Same flags as `--preset`, `--clean`, `--no-headers`, `--jobs` |
-| `archxref.ps1`      | `archxref.sh`      | Same interface                                                |
-| `archgraph.ps1`     | `archgraph.sh`     | Same interface                                                |
-| `arch_overview.ps1` | `arch_overview.sh` | Same flags: `--chunked`, `--single`                           |
-| `archpass2.ps1`     | `archpass2.sh`     | Same flags: `--only`, `--clean`                               |
+A small set of old `.sh` ports survives under `llm_Dep/` for historical reference only:
 
-### Bash Usage Examples
-
-```bash
-./archgen.sh --preset quake --jobs 4
-./archxref.sh
-./archgraph.sh
-./arch_overview.sh --chunked
-./archpass2.sh --only server/sv_main.c,client/cl_main.c
+```
+llm_Dep/arch_overview.sh
+llm_Dep/archgen.sh
+llm_Dep/archgraph.sh
+llm_Dep/archpass2.sh
+llm_Dep/archxref.sh
 ```
 
-Note: `serena_extract.ps1` does not have a bash equivalent. Run `serena_extract.py` directly on non-Windows systems:
+These five scripts:
+- predate the local-LLM backend and assume the legacy `claude` CLI only (no `LLM_BACKEND` / vLLM / Ollama support);
+- have not been kept in sync with the `.ps1` scripts (missing optimization flags, dir-context, shared headers, etc.);
+- have no ports for `serena_extract`, `archgen_dirs`, or `archpass2_context`.
+
+Do not use them for new work. PowerShell 7+ (`pwsh`) is cross-platform; run the `.ps1` scripts directly on Linux/macOS.
+
+For the LSP extraction step on non-Windows systems, run the Python client directly:
 
 ```bash
 uv run --python 3.12 serena_extract.py --repo-root /path/to/repo --target-dir src
@@ -764,9 +773,23 @@ uv run --python 3.12 serena_extract.py --repo-root /path/to/repo --target-dir sr
 
 ---
 
-## 11. Claude Model Usage
+## 12. Model / Backend Usage
 
-### Models by Script
+### Backends
+
+The LLM-driven stages (`archgen.ps1`, `archgen_dirs.ps1`, `arch_overview.ps1`, `archpass2.ps1`) route through `llm_core.ps1` and are selected by `LLM_BACKEND` in `.env`:
+
+| `LLM_BACKEND` | Target                                                      | Model selection                                                                                       |
+|---------------|-------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
+| `ollama`      | **Default.** Raw Ollama server (`/api/chat`).               | `LLM_DEFAULT_MODEL` (default `qwen3.6:27B`, a thinking model). `LLM_THINK=true` separates reasoning.   |
+| `vllm`        | LLMConfig OpenAI gateway at `http://192.168.1.40:11430/v1`. | `LLM_DEFAULT_MODEL` (e.g. `qwen3-coder-30b`, a vLLM served-name with hyphens).                         |
+| `claude`      | Legacy `claude` CLI. Only backend needing `CLAUDE{1,2}_CONFIG_DIR`. | `CLAUDE_MODEL` (`haiku`/`sonnet`) with `TIERED_MODEL` auto-upgrade (see below).                |
+
+`llm_core.ps1` exposes `Get-LLMBackend`, `Get-LLMEndpoint`, `Get-LLMModel`, and `Invoke-LocalLLM`. Model id conventions differ: vLLM served-names use hyphens (`qwen3.6-27b`), Ollama tags use colons (`qwen3.6:27B`).
+
+The `haiku`/`sonnet` model selection and the `TIERED_MODEL` auto-upgrade described in the rest of this section apply **only when `LLM_BACKEND=claude`**. For the local backends (`ollama`, `vllm`) the served model is fixed by `LLM_DEFAULT_MODEL` (with `arch_overview.ps1` / `archgen_dirs.ps1` using larger token budgets via `LLM_OVERVIEW_MAX_TOKENS` / `LLM_DIR_MAX_TOKENS`).
+
+### Models by Script (Claude backend)
 
 | Script                  | Default Model       | With `TIERED_MODEL=1` (default)                  | With `TIERED_MODEL=0`          |
 |-------------------------|---------------------|--------------------------------------------------|--------------------------------|
@@ -778,7 +801,7 @@ uv run --python 3.12 serena_extract.py --repo-root /path/to/repo --target-dir sr
 | `archpass2_context.ps1` | **None**            | No change                                        | No change                      |
 | `archpass2.ps1`         | haiku (from `.env`) | High-complexity files auto-upgrade to **sonnet** | All files use `CLAUDE_MODEL`   |
 
-Only `archgen.ps1`, `arch_overview.ps1`, and `archpass2.ps1` make Claude API calls. All three support `TIERED_MODEL` for automatic model upgrades. All other scripts are either free (local clangd / text processing) or use no AI at all.
+Only `archgen.ps1`, `archgen_dirs.ps1`, `arch_overview.ps1`, and `archpass2.ps1` make LLM calls. When `LLM_BACKEND=claude`, `archgen.ps1`, `arch_overview.ps1`, and `archpass2.ps1` support `TIERED_MODEL` for automatic haiku-to-sonnet upgrades. All other scripts are either free (local clangd / text processing) or use no AI at all.
 
 ### Tiered Model: Quality Impact
 
@@ -810,11 +833,28 @@ Pass 2 already receives rich context (Pass 1 doc + architecture overview + xref/
 
 ---
 
-## 12. .env Configuration Variables
+## 13. .env Configuration Variables
 
-All variables are optional except the Claude config directories. Set these in a `.env` file at the repo root.
+All variables are optional. Set these in a `.env` file at the repo root.
 
-### Claude Settings
+### LLM Backend Settings
+
+| Variable                  | Default          | Description                                                                                       |
+|---------------------------|------------------|--------------------------------------------------------------------------------------------------|
+| `LLM_BACKEND`             | `ollama`         | LLM backend: `ollama`, `vllm`, or `claude`.                                                       |
+| `LLM_DEFAULT_MODEL`       | `qwen3.6:27B`    | Served model for `ollama`/`vllm` (Ollama tags use colons, vLLM served-names use hyphens).        |
+| `LLM_THINK`               | `true`           | Ollama only: separate reasoning from the answer for thinking models (e.g. `qwen3.6:27B`).         |
+| `LLM_HOST`                | *(from backend)* | Host for the local backend.                                                                       |
+| `LLM_PORT`                | `11434`          | Ollama port.                                                                                      |
+| `LLM_ENDPOINT`            | *(derived)*      | Full-URL override for the backend endpoint.                                                       |
+| `LLM_TEMPERATURE`         | *(model)*        | Sampling temperature.                                                                             |
+| `LLM_MAX_TOKENS`          | *(backend)*      | Max output tokens per call.                                                                       |
+| `LLM_OVERVIEW_MAX_TOKENS` | *(larger)*       | Token budget for `arch_overview.ps1`.                                                             |
+| `LLM_DIR_MAX_TOKENS`      | *(larger)*       | Token budget for `archgen_dirs.ps1`.                                                              |
+| `LLM_TIMEOUT`             | *(backend)*      | Per-call timeout in seconds.                                                                      |
+| `LLM_NUM_CTX`             | `0`              | Ollama `/api/chat` context window. `>0` switches the request to the `num_ctx` chat path.          |
+
+### Claude Settings (only when `LLM_BACKEND=claude`)
 
 | Variable               | Default      | Description                                      |
 |------------------------|--------------|--------------------------------------------------|
@@ -870,18 +910,23 @@ All variables are optional except the Claude config directories. Set these in a 
 
 | Variable         | Default                     | Description                                                                                                                                                                       |
 |------------------|-----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `PROMPT_FILE`    | *(auto-selected)*           | Pass 1 prompt. Auto-selects `file_doc_prompt_lsp.txt` when LSP context exists, otherwise `file_doc_prompt.txt`. Set to `file_doc_prompt_compact.txt` for ~70% fewer prompt tokens. |
-| `PROMPT_FILE_P2` | `file_doc_prompt_pass2.txt` | Pass 2 prompt file                                                                                                                                                                |
+| `PROMPT_FILE`    | *(auto-selected)*           | Pass 1 prompt path. Auto-selects `llm_prompts/file_doc_prompt_lsp.txt` when LSP context exists, otherwise `llm_prompts/file_doc_prompt.txt`. Set to `llm_prompts/file_doc_prompt_compact.txt` for ~70% fewer prompt tokens. (Prompt templates live in `llm_prompts/`; an explicit value is used as-is, so give a path that resolves from the repo root.) |
+| `PROMPT_FILE_P2` | `llm_prompts/file_doc_prompt_pass2.txt` | Pass 2 prompt file (under `llm_prompts/`)                                                                                                                              |
 
 ### Example .env
 
 ```env
-# Claude accounts
-CLAUDE1_CONFIG_DIR=$HOME/.claudeaccount1
-CLAUDE2_CONFIG_DIR=$HOME/.claudeaccount2
+# LLM backend (default: ollama)
+LLM_BACKEND=ollama
+LLM_DEFAULT_MODEL=qwen3.6:27B
+LLM_THINK=true
 
-# Model & parallelism
-CLAUDE_MODEL=haiku
+# Claude accounts (only needed when LLM_BACKEND=claude)
+# CLAUDE1_CONFIG_DIR=$HOME/.claudeaccount1
+# CLAUDE2_CONFIG_DIR=$HOME/.claudeaccount2
+# CLAUDE_MODEL=haiku
+
+# Parallelism
 JOBS=8
 MAX_RETRIES=2
 
@@ -901,12 +946,12 @@ TIERED_MODEL=1
 HIGH_COMPLEXITY_MODEL=sonnet
 BUNDLE_HEADER_DOCS=1
 BATCH_TEMPLATED=1
-PROMPT_FILE=file_doc_prompt_compact.txt
+PROMPT_FILE=llm_prompts/file_doc_prompt_compact.txt
 ```
 
 ---
 
-## 13. Presets
+## 14. Presets
 
 Presets configure include/exclude patterns and codebase descriptions. Set via `-Preset` flag or `PRESET` in `.env`.
 
@@ -924,18 +969,18 @@ Presets can be overridden by setting `INCLUDE_EXT_REGEX`, `EXCLUDE_DIRS_REGEX`, 
 
 ---
 
-## 14. Common Workflows
+## 15. Common Workflows
 
 ### Small Codebase (No LSP)
 
 For codebases under ~500 files where LSP setup isn't worth the effort:
 
 ```powershell
-.\archgen.ps1 -Preset quake -Jobs 8
-.\archxref.ps1
-.\archgraph.ps1
-.\arch_overview.ps1
-.\archpass2.ps1 -Preset quake -Jobs 8
+.\llm_scripts\archgen.ps1 -Preset quake -Jobs 8
+.\llm_scripts\archxref.ps1
+.\llm_scripts\archgraph.ps1
+.\llm_scripts\arch_overview.ps1
+.\llm_scripts\archpass2.ps1 -Preset quake -Jobs 8
 ```
 
 ### Large C++ Codebase (With LSP, Full Optimizations)
@@ -943,14 +988,14 @@ For codebases under ~500 files where LSP setup isn't worth the effort:
 For codebases with `compile_commands.json` and a built clangd index. All optimizations enabled:
 
 ```powershell
-.\serena_extract.ps1 -Preset unreal                        # Free: LSP + trimmed source
-.\archgen_dirs.ps1 -Preset unreal                          # Dir-level overviews (few Claude calls)
-.\archgen.ps1 -Preset unreal -Jobs 8                       # Auto-skips trivial, injects LSP + dir context + shared headers
-.\archxref.ps1
-.\archgraph.ps1
-.\arch_overview.ps1 -Preset unreal                         # Incremental by default
-.\archpass2_context.ps1                                     # Free: targeted context
-.\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500            # Selective, targeted context
+.\llm_scripts\serena_extract.ps1 -Preset unreal                        # Free: LSP + trimmed source
+.\llm_scripts\archgen_dirs.ps1 -Preset unreal                          # Dir-level overviews (few Claude calls)
+.\llm_scripts\archgen.ps1 -Preset unreal -Jobs 8                       # Auto-skips trivial, injects LSP + dir context + shared headers
+.\llm_scripts\archxref.ps1
+.\llm_scripts\archgraph.ps1
+.\llm_scripts\arch_overview.ps1 -Preset unreal                         # Incremental by default
+.\llm_scripts\archpass2_context.ps1                                     # Free: targeted context
+.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500            # Selective, targeted context
 ```
 
 ### Single Subsystem Deep-Dive
@@ -958,13 +1003,13 @@ For codebases with `compile_commands.json` and a built clangd index. All optimiz
 Analyze one part of a large codebase in detail:
 
 ```powershell
-.\serena_extract.ps1 -TargetDir Engine\Source\Runtime\Core -Preset unreal
-.\archgen.ps1 -TargetDir Engine\Source\Runtime\Core -Preset unreal -Jobs 8
-.\archxref.ps1 -TargetDir Engine\Source\Runtime\Core
-.\archgraph.ps1 -TargetDir Engine\Source\Runtime\Core
-.\arch_overview.ps1 -TargetDir Engine\Source\Runtime\Core
-.\archpass2_context.ps1 -TargetDir Engine\Source\Runtime\Core
-.\archpass2.ps1 -TargetDir Engine\Source\Runtime\Core -Jobs 4
+.\llm_scripts\serena_extract.ps1 -TargetDir Engine\Source\Runtime\Core -Preset unreal
+.\llm_scripts\archgen.ps1 -TargetDir Engine\Source\Runtime\Core -Preset unreal -Jobs 8
+.\llm_scripts\archxref.ps1 -TargetDir Engine\Source\Runtime\Core
+.\llm_scripts\archgraph.ps1 -TargetDir Engine\Source\Runtime\Core
+.\llm_scripts\arch_overview.ps1 -TargetDir Engine\Source\Runtime\Core
+.\llm_scripts\archpass2_context.ps1 -TargetDir Engine\Source\Runtime\Core
+.\llm_scripts\archpass2.ps1 -TargetDir Engine\Source\Runtime\Core -Jobs 4
 ```
 
 ### Learning-Oriented Analysis
@@ -972,11 +1017,11 @@ Analyze one part of a large codebase in detail:
 Use the learning prompt for educational documentation:
 
 ```powershell
-# Set in .env: PROMPT_FILE=file_doc_prompt_learn.txt
-.\archgen.ps1 -Preset quake -Jobs 4
-.\archxref.ps1
-.\arch_overview.ps1
-.\archpass2.ps1 -Only "server/sv_main.c,client/cl_main.c,game/g_main.c"
+# Set in .env: PROMPT_FILE=llm_prompts/file_doc_prompt_learn.txt
+.\llm_scripts\archgen.ps1 -Preset quake -Jobs 4
+.\llm_scripts\archxref.ps1
+.\llm_scripts\arch_overview.ps1
+.\llm_scripts\archpass2.ps1 -Only "server/sv_main.c,client/cl_main.c,game/g_main.c"
 ```
 
 ### Preview Pass 2 Scoring
@@ -984,7 +1029,7 @@ Use the learning prompt for educational documentation:
 See which files would be selected before committing to a run:
 
 ```powershell
-.\archpass2.ps1 -Preset unreal -Top 200 -ScoreOnly
+.\llm_scripts\archpass2.ps1 -Preset unreal -Top 200 -ScoreOnly
 ```
 
 ### Resume After Rate Limit
@@ -993,7 +1038,7 @@ Simply re-run the same command. All scripts are fully resumable:
 
 ```powershell
 # This skips already-completed files and continues where it left off
-.\archgen.ps1 -Preset unreal -Jobs 8
+.\llm_scripts\archgen.ps1 -Preset unreal -Jobs 8
 ```
 
 If switching Claude accounts after a rate limit:
@@ -1001,15 +1046,15 @@ If switching Claude accounts after a rate limit:
 ```powershell
 # Clear stale pause file, then switch accounts
 Remove-Item architecture\.archgen_state\ratelimit_resume.txt -ErrorAction SilentlyContinue
-.\archgen.ps1 -Preset unreal -Jobs 8 -Claude1
+.\llm_scripts\archgen.ps1 -Preset unreal -Jobs 8 -Claude1
 ```
 
 ### Clean Start
 
 ```powershell
 # Remove ALL output (Pass 1, Pass 2, xref, overview, diagrams, state)
-.\archgen.ps1 -Clean
+.\llm_scripts\archgen.ps1 -Clean
 
 # Remove only Pass 2 output and state
-.\archpass2.ps1 -Clean
+.\llm_scripts\archpass2.ps1 -Clean
 ```

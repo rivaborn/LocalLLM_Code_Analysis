@@ -1,6 +1,10 @@
 # Architecture Analysis Toolkit — Optimizations
 
-Token optimization strategies for minimizing Claude API usage when analyzing large codebases (36K+ translation units). 28 optimizations across 4 versions.
+Token optimization strategies for minimizing LLM usage when analyzing large codebases (36K+ translation units). 28 optimizations, organized as the v1-v4 sections of this single document.
+
+The LLM backend is configurable (`LLM_BACKEND` in `.env`: `ollama` default / `vllm` / `claude`); these strategies apply to any backend. Token/cost figures below are stated against the original Claude-CLI baseline and remain a useful proxy for payload size on the local backends. References to the `claude` CLI / `--max-tokens` / prompt caching are specific to the legacy `claude` backend.
+
+Scripts live in `llm_scripts/` (run as `.\llm_scripts\<name>.ps1`); prompts live in `llm_prompts/`.
 
 **Baseline:** ~250M tokens for full UE analysis.
 
@@ -240,7 +244,7 @@ The rest is wasted input tokens, repeated for every file.
 
 ### Solution
 
-Build per-file context extracts with `archpass2_context.ps1` (zero Claude calls):
+Build per-file context extracts with `archpass2_context.ps1` (zero LLM calls):
 
 ```powershell
 function Build-TargetedContext($rel, $archContent, $xrefContent) {
@@ -363,7 +367,7 @@ The current prompts use verbose markdown schema descriptions. Every Claude call 
 
 ### Implementation
 
-`file_doc_prompt_compact.txt` (~150 tokens vs ~500):
+`llm_prompts/file_doc_prompt_compact.txt` (~150 tokens vs ~500):
 
 ```
 Static arch analysis of game engine file.
@@ -500,7 +504,7 @@ Every file, Claude rediscovers that `UCLASS()` is a reflection macro, `FName` is
 
 ### Implementation
 
-`ue_preamble.txt`:
+`llm_prompts/ue_preamble.txt`:
 
 ```
 UE CONVENTIONS (do not explain these in output - the reader already knows them):
@@ -535,7 +539,7 @@ The current prompt asks for 7 sections regardless of file complexity. A 30-line 
 
 ### Implementation
 
-`file_doc_prompt_minimal.txt` for files <100 lines with <=3 symbols:
+`llm_prompts/file_doc_prompt_minimal.txt` for files <100 lines with <=3 symbols:
 
 ```
 Static arch analysis. Output ONLY non-empty sections from:
@@ -562,7 +566,7 @@ Pass 2 often repeats information from Pass 1. Instead of producing a complete ne
 
 ### Implementation
 
-Delta-focused `file_doc_prompt_pass2_delta.txt`:
+Delta-focused `llm_prompts/file_doc_prompt_pass2_delta.txt`:
 
 ```
 You have the Pass 1 doc below. Output ONLY information that is NEW -
@@ -1004,8 +1008,8 @@ affect the architecture (e.g., whitespace, comments), reply: NO_CHANGE
 ### CLI
 
 ```powershell
-.\archgen.ps1 -Preset unreal -Jobs 8 -Diff    # Diff-based for changed files
-.\archgen.ps1 -Preset unreal -Jobs 8           # Full re-analysis (current behavior)
+.\llm_scripts\archgen.ps1 -Preset unreal -Jobs 8 -Diff    # Diff-based for changed files
+.\llm_scripts\archgen.ps1 -Preset unreal -Jobs 8           # Full re-analysis (current behavior)
 ```
 
 ---
@@ -1032,13 +1036,13 @@ Phase 1 (upfront, cheap):
 # Already done: archgen_dirs.ps1 (Level 0)
 # Already done: SKIP_TRIVIAL stubs (Level 1 for trivial files)
 # New: generate Level 1 index for all files from LSP context
-.\archgen_index.ps1 -Preset unreal   # Produces architecture/index.md
+.\llm_scripts\archgen_index.ps1 -Preset unreal   # Produces architecture/index.md
 ```
 
 Phase 2 (on-demand):
 ```powershell
 # User browses index.md, wants details on specific files
-.\archgen.ps1 -Only "Engine/Source/Runtime/Engine/Private/Actor.cpp"
+.\llm_scripts\archgen.ps1 -Only "Engine/Source/Runtime/Engine/Private/Actor.cpp"
 ```
 
 ### Impact

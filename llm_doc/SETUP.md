@@ -1,6 +1,8 @@
-# Architecture Analysis Toolkit — Setup & Usage Guide
+# Architecture Analysis Toolkit - Setup & Usage Guide
 
-Automated architecture documentation for game engine codebases using Claude CLI, with optional LSP-powered semantic analysis via clangd. Built for learning by reading real engine code (DOOM, Quake, Unreal, Godot, Unity, etc.).
+Automated architecture documentation for game engine codebases using a configurable LLM backend (default: local Ollama `qwen3.6:27B`; also a vLLM gateway, or the legacy `claude` CLI), selected by `LLM_BACKEND`, with optional LSP-powered semantic analysis via clangd. Built for learning by reading real engine code (DOOM, Quake, Unreal, Godot, Unity, etc.).
+
+The toolkit is laid out at the codebase root: PowerShell scripts in `llm_scripts/`, prompt templates in `llm_prompts/`, docs in `llm_doc/`, deprecated bash ports in `llm_Dep/`. Configuration (`.env`, `.clangd`) and the `architecture/` output directory live at the codebase root. Run every script from the codebase root as `.\llm_scripts\<name>.ps1`.
 
 ---
 
@@ -10,7 +12,7 @@ Automated architecture documentation for game engine codebases using Claude CLI,
 2. [Files in This Toolkit](#2-files-in-this-toolkit)
 3. [Prerequisites](#3-prerequisites)
 4. [Installation](#4-installation)
-5. [Claude CLI Multi-Account Setup](#5-claude-cli-multi-account-setup)
+5. [Claude CLI Multi-Account Setup (Optional - only for the `claude` backend)](#5-claude-cli-multi-account-setup-optional---only-for-the-claude-backend)
 6. [Configuration (.env)](#6-configuration-env)
 7. [Serena / clangd Setup (Optional, for LSP)](#7-serena--clangd-setup-optional-for-lsp)
 8. [Step 0: serena_extract — LSP Context Extraction](#8-step-0-serena_extract--lsp-context-extraction)
@@ -36,11 +38,11 @@ The toolkit runs as a multi-stage pipeline. Each stage builds on the previous on
 ```
                  ┌────────────────────┐
   clangd index ─▶│ serena_extract.ps1 │──▶ .serena_context.txt (per file)
-                 └────────┬───────────┘    (zero Claude calls)
+                 └────────┬───────────┘    (zero LLM calls)
                           │
                  ┌────────▼───────────┐
                  │ archgen_dirs.ps1   │──▶ .dir_context/<dir>.dir.md
-                 └────────┬───────────┘    (few Claude calls, sonnet)
+                 └────────┬───────────┘    (few LLM calls)
                           │
                  ┌────────▼───────────┐
   Source files ─▶│   archgen.ps1      │──▶ Per-file .md docs (pass 1)
@@ -64,16 +66,18 @@ The toolkit runs as a multi-stage pipeline. Each stage builds on the previous on
               └──────────────────┘
 ```
 
-| Step | Script                  | Claude Calls                  | Cost   | What It Produces                                            |
+All scripts live in `llm_scripts/` and are run from the codebase root as `.\llm_scripts\<name>.ps1`. LLM calls go to whatever backend `LLM_BACKEND` selects (default: local Ollama; see Section 6). "Cost" below is in terms of the legacy `claude` backend (haiku/sonnet); with the default local backend the LLM stages are free apart from local compute.
+
+| Step | Script                  | LLM Calls                     | Cost   | What It Produces                                            |
 |------|-------------------------|-------------------------------|--------|-------------------------------------------------------------|
 | 0    | `serena_extract.ps1`    | **0** (local clangd)          | Free   | LSP symbol overviews + cross-file references + trimmed source |
-| 0b   | `archgen_dirs.ps1`      | 1 per directory (sonnet)      | Low    | Per-directory architectural overviews (`.dir.md`)           |
-| 1    | `archgen.ps1`           | 1 per non-trivial file        | Haiku  | Per-file architecture docs with LSP + dir context + shared headers |
+| 0b   | `archgen_dirs.ps1`      | 1 per directory               | Low    | Per-directory architectural overviews (`.dir.md`)           |
+| 1    | `archgen.ps1`           | 1 per non-trivial file        | Low    | Per-file architecture docs with LSP + dir context + shared headers |
 | 2    | `archxref.ps1`          | **0** (text processing)       | Free   | Cross-reference index: who calls whom                       |
 | 3    | `archgraph.ps1`         | **0** (text processing)       | Free   | Mermaid call graph + subsystem diagrams                     |
 | 4    | `arch_overview.ps1`     | 1 (small) or N+1 (chunked)   | Varies | Subsystem-level architecture overview (incremental)         |
 | 4b   | `archpass2_context.ps1` | **0** (text processing)       | Free   | Per-file targeted context for Pass 2                        |
-| 5    | `archpass2.ps1`         | 1 per selected file           | Haiku+ | Context-aware enriched analysis (complex files auto-upgrade to sonnet) |
+| 5    | `archpass2.ps1`         | 1 per selected file           | Low    | Context-aware enriched analysis (complex files auto-upgrade on the `claude` backend) |
 
 Step 0 is optional but recommended for C/C++ codebases with a `compile_commands.json`. Step 0b generates directory-level overviews used as context in Step 1. Steps 2, 3, 4b are always free. Step 1 auto-skips generated/trivial files (configurable) and pre-computes shared directory headers. Step 4 is incremental by default (unchanged subsystems skip; use `-Full` to force). Step 5 with `-Top N` processes only the most important files.
 
@@ -99,33 +103,28 @@ See `Optimization.md` for detailed descriptions of each.
 
 ## 2. Files in This Toolkit
 
-### Pipeline Scripts (PowerShell)
+### Pipeline Scripts (PowerShell, in `llm_scripts/`)
 
 | File                     | Purpose                                                                                  |
 |--------------------------|------------------------------------------------------------------------------------------|
+| `llm_core.ps1`           | Shared LLM backend helpers (dot-sourced by every LLM-calling script and worker)          |
 | `serena_extract.ps1`     | Step 0: LSP extraction wrapper (calls Python script). `-Compress` for LSP compression.   |
-| `serena_extract.py`      | LSP client — talks directly to clangd via JSON-RPC                                       |
-| `archgen_dirs.ps1`       | Step 0b: per-directory architectural overviews (few Claude calls, sonnet)                 |
+| `serena_extract.py`      | LSP client - talks directly to clangd via JSON-RPC                                       |
+| `archgen_dirs.ps1`       | Step 0b: per-directory architectural overviews (few LLM calls)                            |
 | `archgen.ps1`            | Step 1: per-file docs with dir context + shared headers + LSP context + trivial skipping |
 | `archgen_worker.ps1`     | Worker dispatched by archgen (do not run directly)                                       |
-| `archxref.ps1`           | Step 2: cross-reference index (no Claude)                                                |
-| `archgraph.ps1`          | Step 3: Mermaid diagrams (no Claude)                                                     |
+| `archxref.ps1`           | Step 2: cross-reference index (no LLM)                                                   |
+| `archgraph.ps1`          | Step 3: Mermaid diagrams (no LLM)                                                        |
 | `arch_overview.ps1`      | Step 4: architecture overview with auto-chunking (incremental by default)                |
-| `archpass2_context.ps1`  | Step 4b: per-file targeted context for Pass 2 (no Claude)                                |
+| `archpass2_context.ps1`  | Step 4b: per-file targeted context for Pass 2 (no LLM)                                   |
 | `archpass2.ps1`          | Step 5: selective re-analysis with scoring                                               |
 | `archpass2_worker.ps1`   | Worker dispatched by archpass2 (do not run directly)                                     |
 
-### Pipeline Scripts (Bash Equivalents)
+### Deprecated Bash Ports (in `llm_Dep/`)
 
-| File               | Purpose                                          |
-|--------------------|--------------------------------------------------|
-| `archgen.sh`       | Bash equivalent of archgen.ps1 (Linux/macOS/WSL) |
-| `archxref.sh`      | Bash equivalent of archxref.ps1                  |
-| `archgraph.sh`     | Bash equivalent of archgraph.ps1                 |
-| `arch_overview.sh` | Bash equivalent of arch_overview.ps1             |
-| `archpass2.sh`     | Bash equivalent of archpass2.ps1                 |
+The original `.sh` ports predate the local-LLM backend and assume the `claude` CLI only. They are deprecated and kept under `llm_Dep/` for reference - do not use them; use the PowerShell scripts in `llm_scripts/`.
 
-### Prompt Files
+### Prompt Files (in `llm_prompts/`)
 
 | File                          | Purpose                                                      |
 |-------------------------------|--------------------------------------------------------------|
@@ -137,11 +136,11 @@ See `Optimization.md` for detailed descriptions of each.
 | `file_doc_system_prompt.txt`  | Fixed system prompt for prompt caching (used by both workers)|
 | `classify_prompt.txt`         | Classification prompt for two-phase mode (`-Classify`)       |
 
-### Configuration
+### Configuration (at the codebase root)
 
 | File                  | Purpose                                                      |
 |-----------------------|--------------------------------------------------------------|
-| `.env`                | Pipeline configuration (Claude accounts, model, jobs, preset, etc.) |
+| `.env`                | Pipeline configuration (LLM backend, model, jobs, preset, etc.) |
 | `.clangd`             | clangd behavior config (indexing, diagnostics, completion)   |
 | `.serena/project.yml` | Serena per-project config (language servers, ignored paths)  |
 
@@ -163,60 +162,60 @@ See `Optimization.md` for detailed descriptions of each.
 
 ### Required
 
-- **PowerShell 5.1+** (Windows) or **Bash 4+** (Linux/macOS/WSL)
-- **Claude CLI** installed and in `$PATH` (`claude --version`)
-- **Claude Pro account** (two recommended for rate-limit rotation)
+- **PowerShell 5.1+** (Windows). The toolkit is PowerShell-first; the bash ports in `llm_Dep/` are deprecated.
+- **An LLM backend** selected by `LLM_BACKEND` in `.env` (see Section 6):
+  - `ollama` (**default**) - network access to the LLMConfig/Ollama host at `LLM_HOST` (default `192.168.1.40:11434`) serving `qwen3.6:27B`.
+  - `vllm` - the LLMConfig OpenAI gateway at `http://192.168.1.40:11430`.
+  - `claude` (legacy) - **Claude CLI** installed and in `$PATH` (`claude --version`) plus a **Claude Pro account** (two recommended for rate-limit rotation). Required ONLY when `LLM_BACKEND=claude`.
 
-### Optional (for LSP extraction)
+### Optional (for LSP extraction, Step 0)
 
-- **Python 3.12** — via `uv python install 3.12`
-- **uv** — Python package manager (`powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`)
-- **clangd** — C++ language server (install via VS2022 Clang components or `winget install LLVM.LLVM`)
-- **compile_commands.json** — compilation database at repo root (see Section 7)
+- **Python 3.x** (3.12 recommended) - via `uv python install 3.12`
+- **uv** - Python package manager (`powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`)
+- **clangd** - C++ language server (install via VS2022 Clang components or `winget install LLVM.LLVM`)
+- **compile_commands.json** - compilation database at the codebase root (see Section 7)
 
 ---
 
 ## 4. Installation
+
+The toolkit uses a fixed layout at the codebase root: scripts in `llm_scripts/`, prompt templates in `llm_prompts/`, docs in `llm_doc/`, deprecated bash ports in `llm_Dep/`. `.env`, `.clangd`, and the generated `architecture/` directory live at the codebase root.
 
 ### PowerShell (Windows)
 
 ```powershell
 cd C:\path\to\your\game-engine-repo
 
-# Copy all toolkit files to repo root
-Copy-Item C:\path\to\toolkit\archgen.ps1 .
-Copy-Item C:\path\to\toolkit\archgen_worker.ps1 .
-Copy-Item C:\path\to\toolkit\archxref.ps1 .
-Copy-Item C:\path\to\toolkit\archgraph.ps1 .
-Copy-Item C:\path\to\toolkit\arch_overview.ps1 .
-Copy-Item C:\path\to\toolkit\archpass2.ps1 .
-Copy-Item C:\path\to\toolkit\archpass2_worker.ps1 .
-Copy-Item C:\path\to\toolkit\serena_extract.ps1 .
-Copy-Item C:\path\to\toolkit\serena_extract.py .
-Copy-Item C:\path\to\toolkit\file_doc_prompt*.txt .
-Copy-Item C:\path\to\toolkit\.env.template .env  # then edit
+# Create the toolkit subdirectories
+New-Item -ItemType Directory -Force llm_scripts, llm_prompts, llm_doc, llm_Dep
+
+# PowerShell scripts -> llm_scripts/
+Copy-Item C:\path\to\toolkit\llm_scripts\*.ps1 llm_scripts\
+Copy-Item C:\path\to\toolkit\llm_scripts\serena_extract.py llm_scripts\
+
+# Prompt templates -> llm_prompts/
+Copy-Item C:\path\to\toolkit\llm_prompts\*.txt llm_prompts\
+
+# Docs -> llm_doc/ ; deprecated bash ports -> llm_Dep/
+Copy-Item C:\path\to\toolkit\llm_doc\*.md llm_doc\ -ErrorAction SilentlyContinue
+Copy-Item C:\path\to\toolkit\llm_Dep\*.sh llm_Dep\ -ErrorAction SilentlyContinue
+
+# .env at the codebase root, then edit
+Copy-Item C:\path\to\toolkit\.env.template .env
 
 # Add to .gitignore
 Add-Content .gitignore "`n.env`narchitecture/"
 ```
 
-### Bash (Linux/macOS/WSL)
-
-```bash
-cd /path/to/your/game-engine-repo
-
-cp /path/to/toolkit/arch*.sh /path/to/toolkit/file_doc_prompt*.txt .
-cp /path/to/toolkit/.env.template .env  # then edit
-chmod +x arch*.sh
-
-echo -e ".env\narchitecture/" >> .gitignore
-```
+Run scripts from the codebase root, e.g. `.\llm_scripts\archgen.ps1 -Preset unreal -Jobs 8`.
 
 ---
 
-## 5. Claude CLI Multi-Account Setup
+## 5. Claude CLI Multi-Account Setup (Optional - only for the `claude` backend)
 
-Two Claude Pro accounts allow rate-limit rotation — when one account hits its limit, the pipeline switches to the other.
+This section applies **only when `LLM_BACKEND=claude`**. The default `ollama` backend (and `vllm`) need no Claude account - skip this section entirely.
+
+Two Claude Pro accounts allow rate-limit rotation - when one account hits its limit, the pipeline switches to the other.
 
 ### PowerShell
 
@@ -233,22 +232,10 @@ $env:CLAUDE_CONFIG_DIR = "$HOME\.claudeaccount2"
 claude  # login with account 2
 ```
 
-### Bash
-
-```bash
-mkdir ~/.claudeaccount1 ~/.claudeaccount2
-
-alias claude1="CLAUDE_CONFIG_DIR=~/.claudeaccount1 claude"
-alias claude2="CLAUDE_CONFIG_DIR=~/.claudeaccount2 claude"
-source ~/.bashrc
-
-claude1  # login with account 1
-claude2  # login with account 2
-```
-
 ### Configure in .env
 
 ```env
+LLM_BACKEND=claude
 CLAUDE1_CONFIG_DIR=$HOME/.claudeaccount1
 CLAUDE2_CONFIG_DIR=$HOME/.claudeaccount2
 ```
@@ -256,24 +243,54 @@ CLAUDE2_CONFIG_DIR=$HOME/.claudeaccount2
 The pipeline uses account 2 by default. Pass `-Claude1` to switch:
 
 ```powershell
-.\archgen.ps1 -Preset unreal -Claude1
+.\llm_scripts\archgen.ps1 -Preset unreal -Claude1
 ```
 
 ---
 
 ## 6. Configuration (.env)
 
-Create a `.env` file at the repo root. All variables are optional except the Claude config directories.
+Create a `.env` file at the codebase root. All variables are optional; the only required keys are the ones for whichever backend you select (the Claude config directories are required ONLY when `LLM_BACKEND=claude`).
 
-### Core Settings
+### LLM Backend
+
+The LLM-driven stages (Steps 0b, 1, 4, 5) run against the backend selected by `LLM_BACKEND`:
+
+- **`ollama`** (**default**) - raw Ollama server at `http://<LLM_HOST>:<LLM_PORT>` serving `qwen3.6:27B`, a thinking model. Reasoning is separated via the native `/api/chat` endpoint with `LLM_THINK=true`.
+- **`vllm`** - the LLMConfig OpenAI `/v1` gateway at `http://192.168.1.40:11430` (served-name e.g. `qwen3-coder-30b`; the gateway auto-loads the model on first request).
+- **`claude`** - the legacy `claude` CLI path (haiku/sonnet via the `CLAUDE_*` keys). This is the only backend that requires a Claude account + `CLAUDE1_CONFIG_DIR`/`CLAUDE2_CONFIG_DIR`.
+
+Implemented in `llm_scripts/llm_core.ps1` (dot-sourced by every LLM-calling script and worker).
+
+| Variable             | Default          | Description                                                                 |
+|----------------------|------------------|-----------------------------------------------------------------------------|
+| `LLM_BACKEND`        | `ollama`         | Backend selector: `ollama`, `vllm`, or `claude`                             |
+| `LLM_HOST`           | `192.168.1.40`   | LLMConfig / Ollama host                                                      |
+| `LLM_PORT`           | `11434`          | Ollama port (ollama backend only)                                           |
+| `LLM_ENDPOINT`       | *(empty)*        | Full-URL override for the backend endpoint                                  |
+| `LLM_DEFAULT_MODEL`  | `qwen3.6:27B`    | Served model id (Ollama tags use colons; vLLM served-names use hyphens)     |
+| `LLM_TEMPERATURE`    | `0.1`            | Sampling temperature                                                         |
+| `LLM_MAX_TOKENS`     | `1000`           | Max output tokens per call                                                   |
+| `LLM_TIMEOUT`        | `900`            | Per-call timeout in seconds                                                  |
+| `LLM_NUM_CTX`        | `32768`          | Context window (Ollama `/api/chat`)                                          |
+| `LLM_THINK`          | `true`           | Use native thinking mode (separates reasoning); for the Ollama thinking model |
+
+`arch_overview.ps1` and `archgen_dirs.ps1` use larger output budgets via `LLM_OVERVIEW_MAX_TOKENS` / `LLM_DIR_MAX_TOKENS`.
+
+### Claude Backend Settings (used only when `LLM_BACKEND=claude`)
 
 | Variable              | Default      | Description                          |
 |-----------------------|--------------|--------------------------------------|
 | `CLAUDE1_CONFIG_DIR`  | *(required)* | First Claude account config path     |
 | `CLAUDE2_CONFIG_DIR`  | *(required)* | Second Claude account config path    |
-| `CLAUDE_MODEL`        | `sonnet`     | Model: `haiku`, `sonnet`, `opus`     |
+| `CLAUDE_MODEL`        | `haiku`      | Model: `haiku`, `sonnet`, `opus`     |
 | `CLAUDE_MAX_TURNS`    | `1`          | Max turns per Claude call            |
 | `CLAUDE_OUTPUT_FORMAT` | `text`       | Output format                        |
+
+### Core Settings
+
+| Variable              | Default      | Description                          |
+|-----------------------|--------------|--------------------------------------|
 | `JOBS`                | `2`          | Parallel workers                     |
 | `MAX_RETRIES`         | `2`          | Retries per file on transient failure |
 | `RETRY_DELAY`         | `5`          | Seconds between retries              |
@@ -322,9 +339,22 @@ Create a `.env` file at the repo root. All variables are optional except the Cla
 ### Example .env
 
 ```env
-CLAUDE1_CONFIG_DIR=$HOME/.claudeaccount1
-CLAUDE2_CONFIG_DIR=$HOME/.claudeaccount2
-CLAUDE_MODEL=haiku
+# LLM backend (default: local Ollama)
+LLM_BACKEND=ollama
+LLM_HOST=192.168.1.40
+LLM_PORT=11434
+LLM_DEFAULT_MODEL=qwen3.6:27B
+LLM_TEMPERATURE=0.1
+LLM_MAX_TOKENS=1000
+LLM_TIMEOUT=900
+LLM_NUM_CTX=32768
+LLM_THINK=true
+
+# Claude backend (only used when LLM_BACKEND=claude)
+# CLAUDE1_CONFIG_DIR=$HOME/.claudeaccount1
+# CLAUDE2_CONFIG_DIR=$HOME/.claudeaccount2
+# CLAUDE_MODEL=haiku
+
 JOBS=8
 PRESET=unreal
 BUNDLE_HEADERS=1
@@ -372,7 +402,7 @@ This section covers setting up clangd for LSP-powered semantic analysis. This is
 
 ### 7.2 Configure clangd
 
-Create `.clangd` at repo root:
+Create `.clangd` at the codebase root:
 
 ```yaml
 Index:
@@ -396,7 +426,7 @@ Completion:
 
 ### 7.3 Configure Serena (Optional — for interactive LSP queries)
 
-Create `.serena/project.yml` at repo root:
+Create `.serena/project.yml` at the codebase root:
 
 ```yaml
 name: YourProject
@@ -461,11 +491,11 @@ For systems with <32 GB RAM on large codebases, reduce to `-j=2`.
 
 ## 8. Step 0: serena_extract — LSP Context Extraction
 
-Extracts symbol overviews and cross-file references from clangd's index using adaptive parallel workers. **Zero Claude calls — completely free.** Automatically scales clangd instance count based on available RAM. This data is automatically injected into Pass 1.
+Extracts symbol overviews and cross-file references from clangd's index using adaptive parallel workers. **Zero LLM calls - completely free.** Automatically scales clangd instance count based on available RAM. This data is automatically injected into Pass 1.
 
 ### Prerequisites
 
-- `compile_commands.json` at repo root
+- `compile_commands.json` at the codebase root
 - clangd installed (via VS2022 Clang components or LLVM)
 - clangd background index built (`.cache/clangd/index/`)
 - Python 3.12 (`uv python install 3.12`)
@@ -474,25 +504,25 @@ Extracts symbol overviews and cross-file references from clangd's index using ad
 
 ```powershell
 # Auto-detect workers based on free RAM
-.\serena_extract.ps1 -Preset unreal
+.\llm_scripts\serena_extract.ps1 -Preset unreal
 
 # Explicit 3 parallel workers
-.\serena_extract.ps1 -Preset unreal -Workers 3
+.\llm_scripts\serena_extract.ps1 -Preset unreal -Workers 3
 
 # Fast mode: symbols only, no reference queries
-.\serena_extract.ps1 -Preset unreal -SkipRefs
+.\llm_scripts\serena_extract.ps1 -Preset unreal -SkipRefs
 
 # Max speed: 3 workers + skip refs
-.\serena_extract.ps1 -Preset unreal -Workers 3 -SkipRefs
+.\llm_scripts\serena_extract.ps1 -Preset unreal -Workers 3 -SkipRefs
 
 # Single subsystem
-.\serena_extract.ps1 -TargetDir Engine\Source\Runtime\Core -Preset unreal
+.\llm_scripts\serena_extract.ps1 -TargetDir Engine\Source\Runtime\Core -Preset unreal
 
 # Force re-extraction (ignore cached results)
-.\serena_extract.ps1 -Preset unreal -Force
+.\llm_scripts\serena_extract.ps1 -Preset unreal -Force
 
 # Tune for tight RAM (16 GB system)
-.\serena_extract.ps1 -Preset unreal -Workers 1 -MinFreeRAM 4 -RAMPerWorker 4
+.\llm_scripts\serena_extract.ps1 -Preset unreal -Workers 1 -MinFreeRAM 4 -RAMPerWorker 4
 ```
 
 ### Adaptive Parallelism
@@ -557,16 +587,16 @@ Safe to interrupt (Ctrl+C) and resume — completed and empty files are skipped,
 
 ## 8b. Step 0b: archgen_dirs — Directory-Level Overviews
 
-Generates per-directory architectural overviews before Pass 1. Uses sonnet (tiered model). Few Claude calls — one per directory. These overviews are automatically loaded by `archgen.ps1` workers as context for each file.
+Generates per-directory architectural overviews before Pass 1. Few LLM calls - one per directory (on the `claude` backend with `TIERED_MODEL=1`, these use sonnet). These overviews are automatically loaded by `archgen.ps1` workers as context for each file.
 
 ### Usage
 
 ```powershell
 # Full codebase
-.\archgen_dirs.ps1 -Preset unreal
+.\llm_scripts\archgen_dirs.ps1 -Preset unreal
 
 # Single subsystem
-.\archgen_dirs.ps1 -TargetDir Engine\Source\Runtime\Core -Preset unreal
+.\llm_scripts\archgen_dirs.ps1 -TargetDir Engine\Source\Runtime\Core -Preset unreal
 ```
 
 ### What It Produces
@@ -583,19 +613,19 @@ Generates one `.md` doc per source file. When LSP context is available, it's aut
 
 ```powershell
 # Basic usage with preset
-.\archgen.ps1 -Preset unreal -Jobs 8
+.\llm_scripts\archgen.ps1 -Preset unreal -Jobs 8
 
 # Specific subdirectory
-.\archgen.ps1 -TargetDir Engine\Source\Runtime\Renderer -Preset unreal
+.\llm_scripts\archgen.ps1 -TargetDir Engine\Source\Runtime\Renderer -Preset unreal
 
 # Disable header bundling
-.\archgen.ps1 -Preset unreal -NoHeaders
+.\llm_scripts\archgen.ps1 -Preset unreal -NoHeaders
 
 # Use account 1 instead of account 2
-.\archgen.ps1 -Preset unreal -Claude1
+.\llm_scripts\archgen.ps1 -Preset unreal -Claude1
 
 # Start fresh (removes all previous output)
-.\archgen.ps1 -Preset unreal -Clean
+.\llm_scripts\archgen.ps1 -Preset unreal -Clean
 ```
 
 ### Built-In Token Optimizations
@@ -647,10 +677,10 @@ Per-file docs in `architecture/<relative_path>.md`.
 
 ## 10. Step 2: archxref — Cross-Reference Index
 
-Parses all Pass 1 docs and builds a cross-reference index. **No Claude calls** — pure text processing, runs in seconds.
+Parses all Pass 1 docs and builds a cross-reference index. **No LLM calls** - pure text processing, runs in seconds.
 
 ```powershell
-.\archxref.ps1
+.\llm_scripts\archxref.ps1
 ```
 
 ### What It Produces
@@ -667,10 +697,10 @@ Parses all Pass 1 docs and builds a cross-reference index. **No Claude calls** �
 
 ## 11. Step 3: archgraph — Call Graph Diagrams
 
-Extracts call edges from Pass 1 docs and produces Mermaid diagrams. **No Claude calls.**
+Extracts call edges from Pass 1 docs and produces Mermaid diagrams. **No LLM calls.**
 
 ```powershell
-.\archgraph.ps1
+.\llm_scripts\archgraph.ps1
 ```
 
 ### What It Produces
@@ -689,10 +719,10 @@ Synthesizes all Pass 1 docs into a subsystem-level architecture overview. When `
 
 ```powershell
 # Auto-detects single vs chunked mode (incremental by default)
-.\arch_overview.ps1 -Preset unreal
+.\llm_scripts\arch_overview.ps1 -Preset unreal
 
 # Force full regeneration (skip incremental)
-.\arch_overview.ps1 -Preset unreal -Full
+.\llm_scripts\arch_overview.ps1 -Preset unreal -Full
 ```
 
 ### Auto-Chunking
@@ -716,11 +746,11 @@ This produces dramatically better results for large codebases.
 
 ## 12b. Step 4b: archpass2_context — Targeted Context (Optional)
 
-Builds per-file targeted context extracts for Pass 2. Instead of injecting the same 200-line architecture overview and 300-line xref excerpt into every Pass 2 call (mostly irrelevant), this script extracts only the relevant portions for each specific file. **Zero Claude calls — pure text processing, runs in seconds.**
+Builds per-file targeted context extracts for Pass 2. Instead of injecting the same 200-line architecture overview and 300-line xref excerpt into every Pass 2 call (mostly irrelevant), this script extracts only the relevant portions for each specific file. **Zero LLM calls - pure text processing, runs in seconds.**
 
 ```powershell
-.\archpass2_context.ps1
-.\archpass2_context.ps1 -TargetDir Engine\Source\Runtime\Renderer
+.\llm_scripts\archpass2_context.ps1
+.\llm_scripts\archpass2_context.ps1 -TargetDir Engine\Source\Runtime\Renderer
 ```
 
 ### Prerequisites
@@ -749,16 +779,16 @@ Re-analyzes source files with the architecture overview and cross-reference inde
 
 ```powershell
 # Process all files (original behavior)
-.\archpass2.ps1 -Preset unreal -Jobs 8
+.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8
 
 # Selective: only top 500 highest-scoring files
-.\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500
+.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500
 
 # Preview scores without running
-.\archpass2.ps1 -Preset unreal -Top 500 -ScoreOnly
+.\llm_scripts\archpass2.ps1 -Preset unreal -Top 500 -ScoreOnly
 
 # Manual file selection
-.\archpass2.ps1 -Only "Engine/Source/Runtime/Engine/Private/Actor.cpp,Engine/Source/Runtime/CoreUObject/Private/UObject/UObjectBase.cpp"
+.\llm_scripts\archpass2.ps1 -Only "Engine/Source/Runtime/Engine/Private/Actor.cpp,Engine/Source/Runtime/CoreUObject/Private/UObject/UObjectBase.cpp"
 ```
 
 ### Scoring (with -Top N)
@@ -792,6 +822,8 @@ Each `.pass2.md` includes:
 ---
 
 ## 14. Prompt Files
+
+All prompt templates live in `llm_prompts/`. The scripts resolve `PROMPT_FILE` / `PROMPT_FILE_P2` by basename within that directory, so set them to the bare file name (e.g. `PROMPT_FILE=file_doc_prompt_compact.txt`).
 
 ### file_doc_prompt.txt — Standard Prompt
 
@@ -832,7 +864,7 @@ For studying engine architecture. Adds sections the standard prompt doesn't have
 
 Usage:
 ```powershell
-.\archgen.ps1 -Preset quake -Jobs 4   # edit .env: PROMPT_FILE=file_doc_prompt_learn.txt
+.\llm_scripts\archgen.ps1 -Preset quake -Jobs 4   # edit .env: PROMPT_FILE=file_doc_prompt_learn.txt
 ```
 
 ### file_doc_prompt_pass2.txt — Pass 2 Prompt
@@ -871,19 +903,19 @@ cd C:\path\to\quake2-rerelease-dll
 # Set PRESET=quake, CLAUDE_MODEL=haiku, JOBS=8 in .env
 
 # Step 1: Per-file docs (~20 min at JOBS=8, haiku)
-.\archgen.ps1 -TargetDir rerelease -Preset quake -Jobs 8
+.\llm_scripts\archgen.ps1 -TargetDir rerelease -Preset quake -Jobs 8
 
 # Step 2: Cross-reference index (instant)
-.\archxref.ps1
+.\llm_scripts\archxref.ps1
 
 # Step 3: Call graph diagrams (instant)
-.\archgraph.ps1
+.\llm_scripts\archgraph.ps1
 
 # Step 4: Architecture overview
-.\arch_overview.ps1 -Preset quake
+.\llm_scripts\arch_overview.ps1 -Preset quake
 
 # Step 5: Context-aware re-analysis on key files
-.\archpass2.ps1 -Preset quake -Jobs 8 -Only `
+.\llm_scripts\archpass2.ps1 -Preset quake -Jobs 8 -Only `
     "rerelease/g_main.cpp,rerelease/p_client.cpp,rerelease/g_combat.cpp"
 ```
 
@@ -931,32 +963,32 @@ uv python install 3.12
 ```powershell
 # Step 0: LSP extraction (free, adaptive parallel workers)
 #   Auto-scales clangd instances based on free RAM
-.\serena_extract.ps1 -Preset unreal
+.\llm_scripts\serena_extract.ps1 -Preset unreal
 
 # Or: explicit 3 workers, skip refs for max speed
-.\serena_extract.ps1 -Preset unreal -Workers 3 -SkipRefs
+.\llm_scripts\serena_extract.ps1 -Preset unreal -Workers 3 -SkipRefs
 
-# Step 0b: Directory-level overviews (few Claude calls, sonnet)
-.\archgen_dirs.ps1 -Preset unreal
+# Step 0b: Directory-level overviews (few LLM calls)
+.\llm_scripts\archgen_dirs.ps1 -Preset unreal
 
 # Step 1: Pass 1 with LSP + dir context + shared headers + all optimizations
 #   Auto-skips trivial files, uses LSP-trimmed source, adaptive output budget
-.\archgen.ps1 -Preset unreal -Jobs 8
+.\llm_scripts\archgen.ps1 -Preset unreal -Jobs 8
 
 # Step 2: Cross-reference index (instant)
-.\archxref.ps1
+.\llm_scripts\archxref.ps1
 
 # Step 3: Call graph diagrams (instant)
-.\archgraph.ps1
+.\llm_scripts\archgraph.ps1
 
 # Step 4: Architecture overview (incremental by default, chunked for UE)
-.\arch_overview.ps1 -Preset unreal
+.\llm_scripts\arch_overview.ps1 -Preset unreal
 
 # Step 4b: Targeted per-file context for Pass 2 (instant, free)
-.\archpass2_context.ps1
+.\llm_scripts\archpass2_context.ps1
 
 # Step 5: Selective Pass 2 (top 500 files only, uses targeted context)
-.\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500
+.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500
 ```
 
 ### Subsystem-by-Subsystem Approach (Alternative)
@@ -965,16 +997,16 @@ For the first analysis, targeting one subsystem at a time is faster:
 
 ```powershell
 # Start with Core (foundational types)
-.\serena_extract.ps1 -TargetDir Engine\Source\Runtime\Core -Preset unreal
-.\archgen.ps1 -TargetDir Engine\Source\Runtime\Core -Preset unreal -Jobs 8
+.\llm_scripts\serena_extract.ps1 -TargetDir Engine\Source\Runtime\Core -Preset unreal
+.\llm_scripts\archgen.ps1 -TargetDir Engine\Source\Runtime\Core -Preset unreal -Jobs 8
 
 # Then CoreUObject (UObject system)
-.\serena_extract.ps1 -TargetDir Engine\Source\Runtime\CoreUObject -Preset unreal
-.\archgen.ps1 -TargetDir Engine\Source\Runtime\CoreUObject -Preset unreal -Jobs 8
+.\llm_scripts\serena_extract.ps1 -TargetDir Engine\Source\Runtime\CoreUObject -Preset unreal
+.\llm_scripts\archgen.ps1 -TargetDir Engine\Source\Runtime\CoreUObject -Preset unreal -Jobs 8
 
 # Then run xref/overview across everything analyzed so far
-.\archxref.ps1
-.\arch_overview.ps1 -Preset unreal
+.\llm_scripts\archxref.ps1
+.\llm_scripts\arch_overview.ps1 -Preset unreal
 ```
 
 ### Recommended Subsystem Order
@@ -1011,7 +1043,7 @@ Note: serena_extract times vary significantly based on include chain depth. UE f
 ### Key UE Files to Prioritize for Pass 2
 
 ```powershell
-.\archpass2.ps1 -Only `
+.\llm_scripts\archpass2.ps1 -Only `
     "Engine/Source/Runtime/CoreUObject/Private/UObject/UObjectBase.cpp," + `
     "Engine/Source/Runtime/CoreUObject/Private/UObject/GarbageCollection.cpp," + `
     "Engine/Source/Runtime/Engine/Private/Actor.cpp," + `
@@ -1083,8 +1115,8 @@ If using two accounts, switch with `-Claude1` / default (account 2) when one is 
 ### Clean Start
 
 ```powershell
-.\archgen.ps1 -Preset unreal -Clean     # Removes ALL architecture output + state
-.\archpass2.ps1 -Preset unreal -Clean    # Removes only Pass 2 output + state
+.\llm_scripts\archgen.ps1 -Preset unreal -Clean     # Removes ALL architecture output + state
+.\llm_scripts\archpass2.ps1 -Preset unreal -Clean    # Removes only Pass 2 output + state
 ```
 
 ---
@@ -1102,11 +1134,11 @@ The worker automatically degrades context in stages (drop headers → drop LSP �
 
 Run steps 1, 2, and 4 first:
 ```powershell
-.\archgen.ps1 -Preset unreal -Jobs 8
-.\archxref.ps1
-.\arch_overview.ps1 -Preset unreal
+.\llm_scripts\archgen.ps1 -Preset unreal -Jobs 8
+.\llm_scripts\archxref.ps1
+.\llm_scripts\arch_overview.ps1 -Preset unreal
 # Then:
-.\archpass2.ps1 -Preset unreal -Jobs 8
+.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8
 ```
 
 ### clangd crashes / high memory
@@ -1138,12 +1170,16 @@ Some symbols (like `UObject::GetClass`) have thousands of references. The script
 - Target a smaller subdirectory: `-TargetDir Engine\Source\Runtime\Core`
 - Reduce clangd parallelism: `-Jobs 2`
 
-### Claude CLI not found
+### Claude CLI not found (`LLM_BACKEND=claude` only)
 
 Ensure `claude` is in your `$PATH`:
 ```powershell
 claude --version
 ```
+
+### Cannot reach the LLM backend (`ollama` / `vllm`)
+
+Verify network access to the LLMConfig host at `LLM_HOST` (default `192.168.1.40`). For Ollama, check `http://<LLM_HOST>:11434/api/tags`; for the vLLM gateway, check `http://192.168.1.40:11430/v1/models`. Confirm `LLM_BACKEND`, `LLM_HOST`, and `LLM_DEFAULT_MODEL` in `.env` match the server.
 
 ### Rate limit persists after switching accounts
 
@@ -1162,6 +1198,6 @@ Ensure your terminal and `.env` are UTF-8. The pipeline writes all files as UTF-
 
 ### WSL-specific issues
 
-- Keep `JOBS=2` — higher parallelism exhausts WSL memory
+- Keep `JOBS=2` - higher parallelism exhausts WSL memory
 - UE files are significantly larger than Quake files; `MAX_FILE_LINES=3000` may be needed
-- Use bash scripts (`archgen.sh`, etc.) instead of PowerShell in WSL
+- The toolkit is PowerShell-first; run the `llm_scripts/*.ps1` scripts under PowerShell 7 (`pwsh`) inside WSL. The old `.sh` ports in `llm_Dep/` are deprecated and do not support the local-LLM backends.
