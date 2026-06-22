@@ -494,8 +494,8 @@ Remove-Item $fatalFlag     -ErrorAction SilentlyContinue
 Remove-Item $fatalMsg      -ErrorAction SilentlyContinue
 Remove-Item $rateLimitFile -ErrorAction SilentlyContinue
 
-# Pass-2 prompt (auto-generate if missing). Templates live in the toolkit prompts/ dir.
-$promptDir = Join-Path $PSScriptRoot 'prompts'
+# Pass-2 prompt (auto-generate if missing). Templates live in the toolkit llm_prompts/ dir.
+$promptDir = Join-Path (Split-Path $PSScriptRoot -Parent) 'llm_prompts'
 # Opt v2#4: Delta mode uses a different prompt
 if ($Delta) {
     $deltaPrompt = Join-Path $promptDir 'file_doc_prompt_pass2_delta.txt'

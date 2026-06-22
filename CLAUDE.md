@@ -6,13 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Architecture documentation toolkit for Unreal Engine 5.7.3 source code. Generates per-file and subsystem-level architecture docs using Claude CLI, with LSP-powered semantic analysis via clangd.
 
-The repo root is a checkout of the **UnrealEngine source tree** (fork of EpicGames/UnrealEngine, branch `release`), but the work in this directory is the **toolkit** — the `arch*.ps1`/`.sh` scripts, `serena_extract.*`, the prompt templates in `prompts/`, and the toolkit docs in `docs/`. Do not treat this as engine development; the UE source under `Engine/` is the *subject* the toolkit analyzes. (`README.md` is the upstream Epic readme and is not relevant to the toolkit.)
+The repo root is a checkout of the **UnrealEngine source tree** (fork of EpicGames/UnrealEngine, branch `release`), but the work in this directory is the **toolkit** — the `arch*.ps1` + `serena_extract.*` scripts in `llm_scripts/`, the prompt templates in `llm_prompts/`, the toolkit docs in `llm_doc/`, and the deprecated `.sh` ports in `llm_Dep/`. Do not treat this as engine development; the UE source under `Engine/` is the *subject* the toolkit analyzes. (`README.md` is the upstream Epic readme and is not relevant to the toolkit.)
 
 **Repository:** `C:\Coding\rivaborn\Codebases\Epic_Games\UnrealEngine` (fork of EpicGames/UnrealEngine, branch `release`)
 **UE Version:** 5.7.3
 **System:** Windows 11, 32 GB RAM
 
-The toolkit is **PowerShell-first**: the active scripts are the `.ps1` files at the repo root, all reading `.env` for configuration. `*_worker.ps1` scripts are dispatched via `Start-Job` and must never be run directly. The old `.sh` ports are **deprecated** and have been moved to `Dep/` (they predate the local-LLM backend and assume the `claude` CLI only) — do not use or update them.
+The toolkit is **PowerShell-first**: the active scripts live in `llm_scripts/` (run them from the codebase root, e.g. `.\llm_scripts\archgen.ps1`), all reading `.env` from the codebase root. `*_worker.ps1` scripts are dispatched via `Start-Job` and must never be run directly. The old `.sh` ports are **deprecated** and live in `llm_Dep/` (they predate the local-LLM backend and assume the `claude` CLI only) — do not use or update them.
 
 ## Pipeline Order
 
@@ -33,14 +33,14 @@ Run from the repo root (PowerShell). Scripts read `.env`; `-Preset unreal` and `
 
 ```powershell
 # Full pipeline (recommended order)
-.\serena_extract.ps1 -Preset unreal -Workers 2 -Jobs 2   # free; LSP extract (slow, hours on first index)
-.\archgen_dirs.ps1   -Preset unreal                      # per-directory overviews (few sonnet calls)
-.\archgen.ps1        -Preset unreal -Jobs 8              # Pass 1 per-file docs (haiku, sonnet for complex)
-.\archxref.ps1                                           # free; cross-reference index
-.\archgraph.ps1                                          # free; Mermaid call graphs
-.\arch_overview.ps1                                      # subsystem synthesis (sonnet, incremental)
-.\archpass2_context.ps1                                  # free; targeted Pass 2 context
-.\archpass2.ps1      -Preset unreal -Jobs 8 -Top 500    # selective Pass 2 (highest-scoring files)
+.\llm_scripts\serena_extract.ps1 -Preset unreal -Workers 2 -Jobs 2   # free; LSP extract (slow, hours on first index)
+.\llm_scripts\archgen_dirs.ps1   -Preset unreal                      # per-directory overviews (few sonnet calls)
+.\llm_scripts\archgen.ps1        -Preset unreal -Jobs 8              # Pass 1 per-file docs (haiku, sonnet for complex)
+.\llm_scripts\archxref.ps1                                           # free; cross-reference index
+.\llm_scripts\archgraph.ps1                                          # free; Mermaid call graphs
+.\llm_scripts\arch_overview.ps1                                      # subsystem synthesis (sonnet, incremental)
+.\llm_scripts\archpass2_context.ps1                                  # free; targeted Pass 2 context
+.\llm_scripts\archpass2.ps1      -Preset unreal -Jobs 8 -Top 500    # selective Pass 2 (highest-scoring files)
 ```
 
 Useful options:
@@ -150,12 +150,12 @@ Baseline ~250M tokens -> after v1-v3: ~12M tokens (95% reduction)
 
 ## Documentation Files
 
-Toolkit docs live in `docs/`:
-- `docs/SETUP.md` — Full setup guide (20 sections)
-- `docs/Instructions.md` — CLI reference for every script (14 sections)
-- `docs/Quickstart.md` — Condensed reference
-- `docs/SerenaFinal.md` — Complete technical reference (16 sections, 30 lessons learned)
-- `docs/FileReference.md` — Index of all files
-- `docs/Optimizations.md` — Token optimization strategies
+Toolkit docs live in `llm_doc/`:
+- `llm_doc/SETUP.md` — Full setup guide (20 sections)
+- `llm_doc/Instructions.md` — CLI reference for every script (14 sections)
+- `llm_doc/Quickstart.md` — Condensed reference
+- `llm_doc/SerenaFinal.md` — Complete technical reference (16 sections, 30 lessons learned)
+- `llm_doc/FileReference.md` — Index of all files
+- `llm_doc/Optimizations.md` — Token optimization strategies
 
-Prompt templates live in `prompts/` (`file_doc_prompt_*.txt`, `file_doc_system_prompt.txt`, `classify_prompt.txt`, `ue_preamble.txt`); scripts resolve them via `$PSScriptRoot/prompts/`.
+Prompt templates live in `llm_prompts/` (`file_doc_prompt_*.txt`, `file_doc_system_prompt.txt`, `classify_prompt.txt`, `ue_preamble.txt`); `archgen.ps1`/`archpass2.ps1` resolve them as a sibling of `llm_scripts/` via `(Split-Path $PSScriptRoot -Parent)/llm_prompts`.

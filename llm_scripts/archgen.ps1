@@ -221,8 +221,8 @@ if (-not (Test-Path $workerScript)) {
 $serenaContextDir = Join-Path $archDir '.serena_context'
 $hasSerenaContext  = Test-Path $serenaContextDir
 
-# Prompt templates live in the toolkit's prompts/ dir (next to the scripts).
-$promptDir = Join-Path $PSScriptRoot 'prompts'
+# Prompt templates live in the toolkit's llm_prompts/ dir (sibling of llm_scripts/).
+$promptDir = Join-Path (Split-Path $PSScriptRoot -Parent) 'llm_prompts'
 
 # Auto-select LSP prompt if Serena context is available and no explicit PROMPT_FILE set
 $defaultPrompt = if ($hasSerenaContext) { 'file_doc_prompt_lsp.txt' } else { 'file_doc_prompt.txt' }
