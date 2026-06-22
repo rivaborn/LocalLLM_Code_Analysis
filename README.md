@@ -54,10 +54,11 @@ See `llm_core.ps1` for the implementation and `.env.example` for all keys.
 ## Documentation
 
 - `CLAUDE.md` — toolkit guide (pipeline, config, known issues)
-- `Quickstart.md` — condensed reference
-- `Instructions.md` — per-script CLI reference
-- `SETUP.md` — full setup guide
-- `SerenaFinal.md` — LSP-extraction technical reference
-- `Optimizations.md` — token-optimization strategies
-- `FileReference.md` — index of every file
+- `prompts/` — LLM prompt templates (`file_doc_prompt_*.txt`, system prompt, classify, preamble)
+- `docs/Quickstart.md` — condensed reference
+- `docs/Instructions.md` — per-script CLI reference
+- `docs/SETUP.md` — full setup guide
+- `docs/SerenaFinal.md` — LSP-extraction technical reference
+- `docs/Optimizations.md` — token-optimization strategies
+- `docs/FileReference.md` — index of every file
 - `Dep/` — deprecated bash ports (unmaintained; PowerShell is the supported path)

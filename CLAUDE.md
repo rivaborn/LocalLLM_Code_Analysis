@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Architecture documentation toolkit for Unreal Engine 5.7.3 source code. Generates per-file and subsystem-level architecture docs using Claude CLI, with LSP-powered semantic analysis via clangd.
 
-The repo root is a checkout of the **UnrealEngine source tree** (fork of EpicGames/UnrealEngine, branch `release`), but the work in this directory is the **toolkit** — the `arch*.ps1`/`.sh` scripts, `serena_extract.*`, the `file_doc_prompt_*.txt` prompt templates, and the `*.md` docs at the repo root. Do not treat this as engine development; the UE source under `Engine/` is the *subject* the toolkit analyzes. (`README.md` is the upstream Epic readme and is not relevant to the toolkit.)
+The repo root is a checkout of the **UnrealEngine source tree** (fork of EpicGames/UnrealEngine, branch `release`), but the work in this directory is the **toolkit** — the `arch*.ps1`/`.sh` scripts, `serena_extract.*`, the prompt templates in `prompts/`, and the toolkit docs in `docs/`. Do not treat this as engine development; the UE source under `Engine/` is the *subject* the toolkit analyzes. (`README.md` is the upstream Epic readme and is not relevant to the toolkit.)
 
 **Repository:** `C:\Coding\rivaborn\Codebases\Epic_Games\UnrealEngine` (fork of EpicGames/UnrealEngine, branch `release`)
 **UE Version:** 5.7.3
@@ -150,9 +150,12 @@ Baseline ~250M tokens -> after v1-v3: ~12M tokens (95% reduction)
 
 ## Documentation Files
 
-- `SETUP.md` — Full setup guide (20 sections)
-- `Instructions.md` — CLI reference for every script (14 sections)
-- `Quickstart.md` — Condensed reference
-- `SerenaFinal.md` — Complete technical reference (16 sections, 30 lessons learned)
-- `FileReference.md` — Index of all files
-- `Optimization.md`, `Optimizations v2.md`, `Optimizations v3.md`, `Optimizations v4.md` — Token optimization strategies
+Toolkit docs live in `docs/`:
+- `docs/SETUP.md` — Full setup guide (20 sections)
+- `docs/Instructions.md` — CLI reference for every script (14 sections)
+- `docs/Quickstart.md` — Condensed reference
+- `docs/SerenaFinal.md` — Complete technical reference (16 sections, 30 lessons learned)
+- `docs/FileReference.md` — Index of all files
+- `docs/Optimizations.md` — Token optimization strategies
+
+Prompt templates live in `prompts/` (`file_doc_prompt_*.txt`, `file_doc_system_prompt.txt`, `classify_prompt.txt`, `ue_preamble.txt`); scripts resolve them via `$PSScriptRoot/prompts/`.

@@ -221,23 +221,26 @@ if (-not (Test-Path $workerScript)) {
 $serenaContextDir = Join-Path $archDir '.serena_context'
 $hasSerenaContext  = Test-Path $serenaContextDir
 
+# Prompt templates live in the toolkit's prompts/ dir (next to the scripts).
+$promptDir = Join-Path $PSScriptRoot 'prompts'
+
 # Auto-select LSP prompt if Serena context is available and no explicit PROMPT_FILE set
 $defaultPrompt = if ($hasSerenaContext) { 'file_doc_prompt_lsp.txt' } else { 'file_doc_prompt.txt' }
-$promptFile = Cfg 'PROMPT_FILE' (Join-Path $repoRoot $defaultPrompt)
+$promptFile = Cfg 'PROMPT_FILE' (Join-Path $promptDir $defaultPrompt)
 if (-not (Test-Path $promptFile)) {
     # Fall back to standard prompt if LSP prompt doesn't exist
-    $promptFile = Join-Path $repoRoot 'file_doc_prompt.txt'
+    $promptFile = Join-Path $promptDir 'file_doc_prompt.txt'
 }
 if (-not (Test-Path $promptFile)) { Write-Err "Missing prompt file: $promptFile"; exit 2 }
 
 # Opt v2#3: Minimal prompt for simple files
-$minimalPromptFile = Join-Path $repoRoot 'file_doc_prompt_minimal.txt'
+$minimalPromptFile = Join-Path $promptDir 'file_doc_prompt_minimal.txt'
 if (-not (Test-Path $minimalPromptFile)) { $minimalPromptFile = '' }
 
 # Opt v2#2: Engine knowledge preamble
 $preambleContent = ''
 if ($usePreamble -eq '1') {
-    $preamblePath = Join-Path $repoRoot 'ue_preamble.txt'
+    $preamblePath = Join-Path $promptDir 'ue_preamble.txt'
     if (Test-Path $preamblePath) {
         $preambleContent = Get-Content $preamblePath -Raw
     }
@@ -1457,7 +1460,7 @@ if ($bundleHdrs -eq '1' -and $queue.Count -gt 0) {
 
 if ($useClassify -eq '1' -and $queue.Count -gt 0) {
     Write-Host "Running classification phase..." -ForegroundColor Cyan
-    $classifyPrompt = Join-Path $repoRoot 'classify_prompt.txt'
+    $classifyPrompt = Join-Path $promptDir 'classify_prompt.txt'
     if (Test-Path $classifyPrompt) {
         $classifyQueue = [System.Collections.Generic.List[string]]::new()
         foreach ($r in $queue) {

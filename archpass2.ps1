@@ -494,18 +494,19 @@ Remove-Item $fatalFlag     -ErrorAction SilentlyContinue
 Remove-Item $fatalMsg      -ErrorAction SilentlyContinue
 Remove-Item $rateLimitFile -ErrorAction SilentlyContinue
 
-# Pass-2 prompt (auto-generate if missing)
+# Pass-2 prompt (auto-generate if missing). Templates live in the toolkit prompts/ dir.
+$promptDir = Join-Path $PSScriptRoot 'prompts'
 # Opt v2#4: Delta mode uses a different prompt
 if ($Delta) {
-    $deltaPrompt = Join-Path $repoRoot 'file_doc_prompt_pass2_delta.txt'
+    $deltaPrompt = Join-Path $promptDir 'file_doc_prompt_pass2_delta.txt'
     if (Test-Path $deltaPrompt) {
         $promptFileP2 = $deltaPrompt
     } else {
         Write-Host "Warning: Delta prompt not found at $deltaPrompt, using standard pass-2 prompt" -ForegroundColor Yellow
-        $promptFileP2 = Cfg $cfg 'PROMPT_FILE_P2' (Join-Path $repoRoot 'file_doc_prompt_pass2.txt')
+        $promptFileP2 = Cfg $cfg 'PROMPT_FILE_P2' (Join-Path $promptDir 'file_doc_prompt_pass2.txt')
     }
 } else {
-    $promptFileP2 = Cfg $cfg 'PROMPT_FILE_P2' (Join-Path $repoRoot 'file_doc_prompt_pass2.txt')
+    $promptFileP2 = Cfg $cfg 'PROMPT_FILE_P2' (Join-Path $promptDir 'file_doc_prompt_pass2.txt')
 }
 if (-not (Test-Path $promptFileP2)) {
     Write-Host "No pass-2 prompt found at: $promptFileP2 - generating default..." -ForegroundColor Yellow
