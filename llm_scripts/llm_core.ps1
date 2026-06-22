@@ -103,8 +103,10 @@ function Invoke-LocalLLM {
     $Endpoint = $Endpoint.TrimEnd('/')
 
     # Thinking models emit reasoning AND content from the same num_predict budget;
-    # too small a budget returns empty content. Floor it when -Think is on.
-    if ($Think -and $MaxTokens -lt $script:LLM_THINK_MIN_TOKENS) {
+    # too small a budget returns empty content. Floor it ONLY on the ollama native
+    # (thinking) path -- on vLLM/claude the floor would just inflate max_tokens and
+    # risk context-overflow 400s on large files.
+    if ($Think -and $Backend -eq 'ollama' -and $NumCtx -gt 0 -and $MaxTokens -lt $script:LLM_THINK_MIN_TOKENS) {
         $MaxTokens = $script:LLM_THINK_MIN_TOKENS
     }
 
