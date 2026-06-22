@@ -1,6 +1,6 @@
 # Architecture Analysis Toolkit — Quickstart
 
-Generate architecture documentation for C++ game engine codebases using a local LLM (or the legacy Claude CLI) + clangd LSP.
+Generate architecture documentation for C++ game engine codebases using a local LLM (or the Claude CLI) + clangd LSP.
 
 Scripts live in `llm_scripts/`; run them from the codebase root as `.\llm_scripts\<name>.ps1`.
 
@@ -204,7 +204,7 @@ The LLM-driven stages run against the backend selected by `LLM_BACKEND` in `.env
 
 - **`ollama`** (default) — local Ollama server at `LLM_HOST:LLM_PORT` (default `192.168.1.40:11434`), model `qwen3.6:27B` (a thinking model; `LLM_THINK=true`).
 - **`vllm`** — OpenAI-compatible gateway at `192.168.1.40:11430`, model `qwen3-coder-30b`.
-- **`claude`** — legacy `claude` CLI (haiku/sonnet via the `CLAUDE_*` keys, dual-account rotation).
+- **`claude`** — `claude` CLI (haiku/sonnet via the `CLAUDE_*` keys, dual-account rotation).
 
 The model/tier columns below describe the **claude** backend; on the local backends, every call uses `LLM_DEFAULT_MODEL`.
 

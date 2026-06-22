@@ -1,6 +1,6 @@
 # Architecture Analysis Toolkit - Setup & Usage Guide
 
-Automated architecture documentation for game engine codebases using a configurable LLM backend (default: local Ollama `qwen3.6:27B`; also a vLLM gateway, or the legacy `claude` CLI), selected by `LLM_BACKEND`, with optional LSP-powered semantic analysis via clangd. Built for learning by reading real engine code (DOOM, Quake, Unreal, Godot, Unity, etc.).
+Automated architecture documentation for game engine codebases using a configurable LLM backend (default: local Ollama `qwen3.6:27B`; also a vLLM gateway, or the `claude` CLI), selected by `LLM_BACKEND`, with optional LSP-powered semantic analysis via clangd. Built for learning by reading real engine code (DOOM, Quake, Unreal, Godot, Unity, etc.).
 
 The toolkit is laid out at the codebase root: PowerShell scripts in `llm_scripts/`, prompt templates in `llm_prompts/`, docs in `llm_doc/`, deprecated bash ports in `llm_Dep/`. Configuration (`.env`, `.clangd`) and the `architecture/` output directory live at the codebase root. Run every script from the codebase root as `.\llm_scripts\<name>.ps1`.
 
@@ -66,7 +66,7 @@ The toolkit runs as a multi-stage pipeline. Each stage builds on the previous on
               └──────────────────┘
 ```
 
-All scripts live in `llm_scripts/` and are run from the codebase root as `.\llm_scripts\<name>.ps1`. LLM calls go to whatever backend `LLM_BACKEND` selects (default: local Ollama; see Section 6). "Cost" below is in terms of the legacy `claude` backend (haiku/sonnet); with the default local backend the LLM stages are free apart from local compute.
+All scripts live in `llm_scripts/` and are run from the codebase root as `.\llm_scripts\<name>.ps1`. LLM calls go to whatever backend `LLM_BACKEND` selects (default: local Ollama; see Section 6). "Cost" below is in terms of the `claude` backend (haiku/sonnet); with the default local backend the LLM stages are free apart from local compute.
 
 | Step | Script                  | LLM Calls                     | Cost   | What It Produces                                            |
 |------|-------------------------|-------------------------------|--------|-------------------------------------------------------------|
@@ -166,7 +166,7 @@ The original `.sh` ports predate the local-LLM backend and assume the `claude` C
 - **An LLM backend** selected by `LLM_BACKEND` in `.env` (see Section 6):
   - `ollama` (**default**) - network access to the LLMConfig/Ollama host at `LLM_HOST` (default `192.168.1.40:11434`) serving `qwen3.6:27B`.
   - `vllm` - the LLMConfig OpenAI gateway at `http://192.168.1.40:11430`.
-  - `claude` (legacy) - **Claude CLI** installed and in `$PATH` (`claude --version`) plus a **Claude Pro account** (two recommended for rate-limit rotation). Required ONLY when `LLM_BACKEND=claude`.
+  - `claude` - **Claude CLI** installed and in `$PATH` (`claude --version`) plus a **Claude Pro account** (two recommended for rate-limit rotation). Required ONLY when `LLM_BACKEND=claude`.
 
 ### Optional (for LSP extraction, Step 0)
 
@@ -258,7 +258,7 @@ The LLM-driven stages (Steps 0b, 1, 4, 5) run against the backend selected by `L
 
 - **`ollama`** (**default**) - raw Ollama server at `http://<LLM_HOST>:<LLM_PORT>` serving `qwen3.6:27B`, a thinking model. Reasoning is separated via the native `/api/chat` endpoint with `LLM_THINK=true`.
 - **`vllm`** - the LLMConfig OpenAI `/v1` gateway at `http://192.168.1.40:11430` (served-name e.g. `qwen3-coder-30b`; the gateway auto-loads the model on first request).
-- **`claude`** - the legacy `claude` CLI path (haiku/sonnet via the `CLAUDE_*` keys). This is the only backend that requires a Claude account + `CLAUDE1_CONFIG_DIR`/`CLAUDE2_CONFIG_DIR`.
+- **`claude`** - the `claude` CLI path (haiku/sonnet via the `CLAUDE_*` keys). This is the only backend that requires a Claude account + `CLAUDE1_CONFIG_DIR`/`CLAUDE2_CONFIG_DIR`.
 
 Implemented in `llm_scripts/llm_core.ps1` (dot-sourced by every LLM-calling script and worker).
 

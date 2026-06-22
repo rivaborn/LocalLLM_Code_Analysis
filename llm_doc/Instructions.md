@@ -759,7 +759,7 @@ llm_Dep/archxref.sh
 ```
 
 These five scripts:
-- predate the local-LLM backend and assume the legacy `claude` CLI only (no `LLM_BACKEND` / vLLM / Ollama support);
+- predate the local-LLM backend and assume the `claude` CLI only (no `LLM_BACKEND` / vLLM / Ollama support);
 - have not been kept in sync with the `.ps1` scripts (missing optimization flags, dir-context, shared headers, etc.);
 - have no ports for `serena_extract`, `archgen_dirs`, or `archpass2_context`.
 
@@ -783,7 +783,7 @@ The LLM-driven stages (`archgen.ps1`, `archgen_dirs.ps1`, `arch_overview.ps1`, `
 |---------------|-------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
 | `ollama`      | **Default.** Raw Ollama server (`/api/chat`).               | `LLM_DEFAULT_MODEL` (default `qwen3.6:27B`, a thinking model). `LLM_THINK=true` separates reasoning.   |
 | `vllm`        | LLMConfig OpenAI gateway at `http://192.168.1.40:11430/v1`. | `LLM_DEFAULT_MODEL` (e.g. `qwen3-coder-30b`, a vLLM served-name with hyphens).                         |
-| `claude`      | Legacy `claude` CLI. Only backend needing `CLAUDE{1,2}_CONFIG_DIR`. | `CLAUDE_MODEL` (`haiku`/`sonnet`) with `TIERED_MODEL` auto-upgrade (see below).                |
+| `claude`      | `claude` CLI. Only backend needing `CLAUDE{1,2}_CONFIG_DIR`. | `CLAUDE_MODEL` (`haiku`/`sonnet`) with `TIERED_MODEL` auto-upgrade (see below).                |
 
 `llm_core.ps1` exposes `Get-LLMBackend`, `Get-LLMEndpoint`, `Get-LLMModel`, and `Invoke-LocalLLM`. Model id conventions differ: vLLM served-names use hyphens (`qwen3.6-27b`), Ollama tags use colons (`qwen3.6:27B`).
 

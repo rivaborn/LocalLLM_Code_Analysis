@@ -29,7 +29,7 @@ This document is the definitive summary of the entire multi-session effort to in
 
 The overarching objective was to build a multi-pass architecture documentation pipeline for large C++ game engine codebases, combining:
 
-- **Archgen** — A PowerShell toolchain that uses the configured LLM backend (default: local Ollama `qwen3.6:27B`) to generate per-file and subsystem-level architecture documentation. The backend is selected by `LLM_BACKEND` in `.env`: `ollama` (default), `vllm` (gateway), or the legacy `claude` CLI.
+- **Archgen** — A PowerShell toolchain that uses the configured LLM backend (default: local Ollama `qwen3.6:27B`) to generate per-file and subsystem-level architecture documentation. The backend is selected by `LLM_BACKEND` in `.env`: `ollama` (default), `vllm` (gateway), or the `claude` CLI.
 - **Serena** — An MCP server providing LSP-backed semantic code analysis (symbol lookup, cross-file references, call hierarchies) via clangd.
 - **Target codebases** — Unreal Engine 5.7.3 (massive, ~43K translation units) and Quake 2 Rerelease DLL (moderate, ~150 files).
 
@@ -58,7 +58,7 @@ The key value proposition: Serena's clangd integration provides **ground-truth**
 
 ## 3. Archgen Toolchain
 
-The archgen toolchain is a set of PowerShell scripts (in `llm_scripts/`) that use the configured LLM backend (default: local Ollama `qwen3.6:27B`; alternatives are the `vllm` gateway and the legacy `claude` CLI, selected via `LLM_BACKEND` in `.env`) to generate per-file architecture documentation for large game engine codebases. Scripts are run as `.\llm_scripts\<name>.ps1` from the codebase root; prompts live in `llm_prompts/`. (A handful of older bash ports exist in `llm_Dep/`, but they are deprecated, unmaintained, and incomplete — only 5 scripts were ever ported, and they predate the local-LLM backend. PowerShell is the only supported path.)
+The archgen toolchain is a set of PowerShell scripts (in `llm_scripts/`) that use the configured LLM backend (default: local Ollama `qwen3.6:27B`; alternatives are the `vllm` gateway and the `claude` CLI, selected via `LLM_BACKEND` in `.env`) to generate per-file architecture documentation for large game engine codebases. Scripts are run as `.\llm_scripts\<name>.ps1` from the codebase root; prompts live in `llm_prompts/`. (A handful of older bash ports exist in `llm_Dep/`, but they are deprecated, unmaintained, and incomplete — only 5 scripts were ever ported, and they predate the local-LLM backend. PowerShell is the only supported path.)
 
 ### 3.1 Pipeline Stages
 
