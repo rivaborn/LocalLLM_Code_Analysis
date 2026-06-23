@@ -159,5 +159,6 @@ Toolkit docs live in `llm_doc/`:
 - `llm_doc/SerenaFinal.md` — Complete LSP-extraction technical reference
 - `llm_doc/FileReference.md` — Index of all files
 - `llm_doc/Optimizations.md` — Token optimization strategies
+- `llm_doc/ModelComparison.md` — Backend & prompt benchmark (RHI/Public A/B; accuracy + cost)
 
 Prompt templates live in `llm_prompts/` (`file_doc_prompt_*.txt`, `file_doc_system_prompt.txt`, `classify_prompt.txt`, `ue_preamble.txt`); `archgen.ps1`/`archpass2.ps1` resolve them as a sibling of `llm_scripts/` via `(Split-Path $PSScriptRoot -Parent)/llm_prompts`.
