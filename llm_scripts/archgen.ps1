@@ -194,6 +194,15 @@ if ($llmBackend -eq 'ollama' -and $jobCount -gt 1) {
     Write-Host "Ollama backend: forcing Jobs=1 (concurrent requests split num_ctx and drop large files)" -ForegroundColor Yellow
     $jobCount = 1
 }
+# Batch-small-files / batch-templated pack several files into one request and split
+# the response by delimiter. That splitting is tuned for the online claude CLI;
+# local LLM servers (ollama/vllm) format responses differently and the split
+# corrupts output (stub docs + concatenated blobs). Restrict batching to claude.
+if ($llmBackend -ne 'claude' -and ($batchSmallFiles -eq '1' -or $batchTemplated -eq '1')) {
+    Write-Host "$llmBackend backend: disabling file batching (response-split is claude-only; local models would corrupt)" -ForegroundColor Yellow
+    $batchSmallFiles = '0'
+    $batchTemplated  = '0'
+}
 
 $account      = if ($Claude1) { 'claude1' } else { 'claude2' }
 $cfgDirKey    = if ($Claude1) { 'CLAUDE1_CONFIG_DIR' } else { 'CLAUDE2_CONFIG_DIR' }
