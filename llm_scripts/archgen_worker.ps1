@@ -475,8 +475,12 @@ while ($true) {
         break
     }
 
-    # Prompt too long — degrade context and retry immediately (no attempt increment)
-    if (Test-TooLong $respText) {
+    # Prompt too long — degrade context and retry immediately (no attempt increment).
+    # Local backends (ollama/vllm) signal context overflow as a 400/"context length"
+    # error rather than the claude "prompt too long" text, so treat those the same
+    # (drop headers, then truncate) instead of fatal-aborting the run.
+    $localTooLong = ($llmBackend -ne 'claude') -and ($exitCode -ne 0) -and ($respText -match '400|context length|maximum context|context window|exceed|too long|too large')
+    if ((Test-TooLong $respText) -or $localTooLong) {
         $stage++
         if ($stage -le $maxStage) {
             $stageLabel = switch ($stage) {
