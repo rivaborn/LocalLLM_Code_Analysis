@@ -476,10 +476,13 @@ while ($true) {
     }
 
     # Prompt too long — degrade context and retry immediately (no attempt increment).
-    # Local backends (ollama/vllm) signal context overflow as a 400/"context length"
-    # error rather than the claude "prompt too long" text, so treat those the same
-    # (drop headers, then truncate) instead of fatal-aborting the run.
-    $localTooLong = ($llmBackend -ne 'claude') -and ($exitCode -ne 0) -and ($respText -match '400|context length|maximum context|context window|exceed|too long|too large')
+    # Local backends (ollama/vllm) signal an oversized/overwhelming prompt several ways:
+    # a 400/"context length" error (overflow), OR empty/short/thinking-exhausted output
+    # when a huge prompt (e.g. file + many bundled headers) drives the model to emit
+    # nothing. Treat all of these like "too long" -> drop headers, then truncate, instead
+    # of fatal-aborting the run. (A genuinely small file that still fails will exhaust all
+    # stages and fail as before.)
+    $localTooLong = ($llmBackend -ne 'claude') -and ($exitCode -ne 0) -and ($respText -match '400|context length|maximum context|context window|exceed|too long|too large|exhausted budget|[Ee]mpty response|suspiciously short')
     if ((Test-TooLong $respText) -or $localTooLong) {
         $stage++
         if ($stage -le $maxStage) {
