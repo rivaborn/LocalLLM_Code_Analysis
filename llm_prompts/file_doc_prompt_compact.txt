@@ -1,6 +1,6 @@
 Static arch analysis of game engine file.
 
-Input: FILE PATH, LSP CONTEXT (if any), FILE CONTENT, possibly BUNDLED HEADERS.
+Input: FILE PATH, LSP CONTEXT (if any), FILE CONTENT.
 LSP context is authoritative for cross-refs — use it over guessing.
 
 Output schema (deterministic md, no deviation):
