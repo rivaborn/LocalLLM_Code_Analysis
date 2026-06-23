@@ -434,6 +434,14 @@ while ($true) {
                                  $bundleHeaderDocs $archDir $outputBudget
     }
 
+    # DEBUG: optional literal prompt capture (env-gated; no-op when ARCHGEN_DUMP_PROMPT is unset)
+    if ($env:ARCHGEN_DUMP_PROMPT) {
+        try {
+            $dumpName = ($rel -replace '[\\/:*?"<>|]','_') + ".prompt.txt"
+            [IO.File]::WriteAllText((Join-Path $env:ARCHGEN_DUMP_PROMPT $dumpName), $payload, [System.Text.UTF8Encoding]::new($false))
+        } catch {}
+    }
+
     # Opt v3#4: JSON output format
     $fmtArg = if ($jsonOutput -eq "1") { 'json' } else { $outputFmt }
 
