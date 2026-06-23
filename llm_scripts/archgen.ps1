@@ -194,14 +194,21 @@ if ($llmBackend -eq 'ollama' -and $jobCount -gt 1) {
     Write-Host "Ollama backend: forcing Jobs=1 (concurrent requests split num_ctx and drop large files)" -ForegroundColor Yellow
     $jobCount = 1
 }
-# Batch-small-files / batch-templated pack several files into one request and split
-# the response by delimiter. That splitting is tuned for the online claude CLI;
-# local LLM servers (ollama/vllm) format responses differently and the split
-# corrupts output (stub docs + concatenated blobs). Restrict batching to claude.
-if ($llmBackend -ne 'claude' -and ($batchSmallFiles -eq '1' -or $batchTemplated -eq '1')) {
-    Write-Host "$llmBackend backend: disabling file batching (response-split is claude-only; local models would corrupt)" -ForegroundColor Yellow
+# Online claude handles large multi-file / multi-header prompts and the batch-response
+# split; local LLM servers (ollama/vllm) do not. Batching corrupts their output (the
+# delimiter-split is claude-only -> stub docs + concatenated blobs), and big prompts
+# (file + many bundled headers) drive them to empty output. Keep local payloads lean:
+# no file batching, no header bundling (rely on the file itself + injected LSP context).
+if ($llmBackend -ne 'claude') {
+    if ($batchSmallFiles -eq '1' -or $batchTemplated -eq '1') {
+        Write-Host "$llmBackend backend: disabling file batching (response-split is claude-only)" -ForegroundColor Yellow
+    }
     $batchSmallFiles = '0'
     $batchTemplated  = '0'
+    if ($bundleHdrs -eq '1') {
+        Write-Host "$llmBackend backend: disabling header bundling (large prompts overwhelm local models; using file + LSP context)" -ForegroundColor Yellow
+    }
+    $bundleHdrs = '0'
 }
 
 $account      = if ($Claude1) { 'claude1' } else { 'claude2' }
