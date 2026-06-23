@@ -205,9 +205,9 @@ function Build-Pass2Payload($stage, $rel, $fence, $srcLines, $pass1Content, $arc
             $payload += "`n`nTARGETED ARCHITECTURE + CROSS-REFERENCE CONTEXT:`n$targetedContent"
         }
     } else {
-        # Fall back to original global context
-        if ($stage -le 1) { $payload += "`n`nARCHITECTURE CONTEXT:`n$archContext" }
-        if ($stage -le 0) { $payload += "`n`nCROSS-REFERENCE CONTEXT (excerpt):`n$xrefContext" }
+        # Fall back to original global context (empty on local backends -> sections omitted)
+        if ($stage -le 1 -and $archContext -ne '') { $payload += "`n`nARCHITECTURE CONTEXT:`n$archContext" }
+        if ($stage -le 0 -and $xrefContext -ne '') { $payload += "`n`nCROSS-REFERENCE CONTEXT (excerpt):`n$xrefContext" }
     }
 
     return $payload

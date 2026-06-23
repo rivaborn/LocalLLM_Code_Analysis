@@ -209,6 +209,12 @@ if ($llmBackend -ne 'claude') {
         Write-Host "$llmBackend backend: disabling header bundling (large prompts overwhelm local models; using file + LSP context)" -ForegroundColor Yellow
     }
     $bundleHdrs = '0'
+    # Minimize the local prompt further: drop the engine preamble (online claude keeps it).
+    # Local Pass-1 prompt = file source + injected LSP context + compact schema.
+    if ($usePreamble -eq '1') {
+        Write-Host "$llmBackend backend: disabling engine preamble (minimizing local prompt)" -ForegroundColor Yellow
+    }
+    $usePreamble = '0'
 }
 
 $account      = if ($Claude1) { 'claude1' } else { 'claude2' }
@@ -254,6 +260,13 @@ if (-not (Test-Path $promptFile)) {
     $promptFile = Join-Path $promptDir 'file_doc_prompt.txt'
 }
 if (-not (Test-Path $promptFile)) { Write-Err "Missing prompt file: $promptFile"; exit 2 }
+
+# Local backends: prefer the compact schema to shrink the prompt (LSP context still injects
+# separately into each payload). Online claude keeps the richer LSP/standard schema.
+if ($llmBackend -ne 'claude') {
+    $compactPrompt = Join-Path $promptDir 'file_doc_prompt_compact.txt'
+    if (Test-Path $compactPrompt) { $promptFile = $compactPrompt }
+}
 
 # Opt v2#3: Minimal prompt for simple files
 $minimalPromptFile = Join-Path $promptDir 'file_doc_prompt_minimal.txt'
@@ -1637,8 +1650,8 @@ foreach ($item in $dispatchQueue) {
         }
     }
 
-    # Opt v3#2: Directory context dir
-    $dirContextDir = Join-Path $archDir '.dir_context'
+    # Opt v3#2: Directory context dir (online claude only; local prompts stay lean)
+    $dirContextDir = if ($llmBackend -eq 'claude') { Join-Path $archDir '.dir_context' } else { '' }
 
     # Serialize batch rel list as pipe-separated string
     $relArg = $rels -join '|'

@@ -733,6 +733,8 @@ if ($llmBackend -ne 'claude') {
     $llmEndpoint = Get-LLMEndpoint -Cfg $cfg -Backend $llmBackend
     $llmModel    = Get-LLMModel -Cfg $cfg
     Write-Host "LLM backend: $llmBackend ($llmEndpoint, model=$llmModel)" -ForegroundColor Green
+    # Local context is smaller than claude's; use smaller synthesis chunks so each fits.
+    if ($chunkThreshold -gt 800) { $chunkThreshold = 800; Write-Host "  (local: chunk threshold capped to 800)" -ForegroundColor DarkYellow }
 }
 
 $cfgDirKey    = if ($Claude1) { 'CLAUDE1_CONFIG_DIR' } else { 'CLAUDE2_CONFIG_DIR' }

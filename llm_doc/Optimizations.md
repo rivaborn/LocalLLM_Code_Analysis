@@ -2,7 +2,7 @@
 
 Token optimization strategies for minimizing LLM usage when analyzing large codebases (36K+ translation units). 28 optimizations, organized as the v1-v4 sections of this single document.
 
-The LLM backend is configurable (`LLM_BACKEND` in `.env`: `ollama` default / `vllm` / `claude`); these strategies apply to any backend. Token/cost figures below are stated against the original Claude-CLI baseline and remain a useful proxy for payload size on the local backends. References to the `claude` CLI / `--max-tokens` / prompt caching are specific to the `claude` backend.
+The LLM backend is configurable (`LLM_BACKEND` in `.env`: `ollama` default / `vllm` / `claude`); these strategies apply to any backend. Token/cost figures below are stated against the original Claude-CLI baseline and remain a useful proxy for payload size on the local backends. References to the `claude` CLI / `--max-tokens` / prompt caching are specific to the `claude` backend. The prompt-bloating optimizations -- header bundling (v1#2/v3#19), file & templated batching (v2#9/v1#6), the engine preamble (v2#10), directory context (v3#16), and the Pass-2 architecture/xref context -- are applied ONLY on the `claude` backend; local backends (ollama/vllm) run a minimal prompt (source + LSP context + compact schema) to avoid the empty-output failures big prompts cause.
 
 Scripts live in `llm_scripts/` (run as `.\llm_scripts\<name>.ps1`); prompts live in `llm_prompts/`.
 

@@ -326,6 +326,7 @@ if ($llmBackend -ne 'claude') {
     $llmEndpoint = Get-LLMEndpoint -Cfg $script:cfg -Backend $llmBackend
     $llmModel    = Get-LLMModel -Cfg $script:cfg
     Write-Host "LLM backend: $llmBackend ($llmEndpoint, model=$llmModel)" -ForegroundColor Green
+    Write-Host "NOTE: directory context is NOT used by the local Pass-1 prompt (it's claude-only). Running archgen_dirs on a local backend is optional / can be skipped." -ForegroundColor DarkYellow
 }
 
 $cfgDirKey    = if ($Claude1) { 'CLAUDE1_CONFIG_DIR' } else { 'CLAUDE2_CONFIG_DIR' }

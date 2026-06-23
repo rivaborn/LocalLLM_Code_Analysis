@@ -691,6 +691,15 @@ if ($toDo -eq 0) { Write-Host "Nothing to do." -ForegroundColor Green; exit 0 }
 # Load context (truncated for context window safety)
 $archContext = (Get-Content $archOverview | Select-Object -First 200) -join "`n"
 $xrefContext = (Get-Content $xrefIndex   | Select-Object -First 300) -join "`n"
+# Local backends: drop the global arch-overview + xref context to keep the Pass-2 prompt lean.
+# The per-file targeted .pass2_context (small) is still injected. Online claude keeps both.
+if ($llmBackend -ne 'claude') {
+    if ($archContext -ne '' -or $xrefContext -ne '') {
+        Write-Host "$llmBackend backend: dropping arch+xref context from Pass-2 prompt (minimizing local prompt)" -ForegroundColor Yellow
+    }
+    $archContext = ''
+    $xrefContext = ''
+}
 Write-Host "Loaded context: arch=$($archContext.Length) chars, xref=$($xrefContext.Length) chars"
 
 # -- Counter file + worker script path ------------------------
