@@ -86,7 +86,6 @@ function Write-RunReport($Overall) {
     $now      = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
     $totalDur = (Get-Date) - $script:runStart
 
-    # outputs under the target scope
     $scanRoot = if ($TargetDir -ne '.' -and $TargetDir -ne 'all') { Join-Path $archDir $TargetDir } else { $archDir }
     $allMd = @(Get-ChildItem $scanRoot -Filter *.md -Recurse -ErrorAction SilentlyContinue)
     $pass2 = @($allMd | Where-Object { $_.Name -like '*.pass2.md' })
@@ -145,10 +144,13 @@ function Write-RunReport($Overall) {
     Set-Content -LiteralPath $ReportPath -Value ($o -join "`n") -Encoding UTF8
 }
 
-function Invoke-Stage($Name, $ScriptName, $ScriptArgs, $Kind, $StateDir) {
+# $Params is a HASHTABLE (named-parameter splat). NOTE: splatting an ARRAY binds
+# positionally in PowerShell, which mis-binds named params -- always use a hashtable.
+function Invoke-Stage($Name, $ScriptName, $Params, $Kind, $StateDir) {
     $path = Join-Path $toolkitDir $ScriptName
+    $argStr = (($Params.GetEnumerator() | ForEach-Object { if ($_.Value -is [bool] -and $_.Value) { "-$($_.Key)" } else { "-$($_.Key) $($_.Value)" } }) -join ' ')
     Write-Host ""
-    Write-Host "===== STAGE: $Name  ($ScriptName $($ScriptArgs -join ' ')) =====" -ForegroundColor Cyan
+    Write-Host "===== STAGE: $Name  ($ScriptName $argStr) =====" -ForegroundColor Cyan
     if (-not (Test-Path $path)) {
         $script:results += [pscustomobject]@{ Name = $Name; Status = 'FAILED'; Duration = [TimeSpan]::Zero; ExitCode = -1; Counts = $null; Fails = @(); Note = "script not found: $ScriptName" }
         Write-Host "STAGE FAILED: $Name -- script not found" -ForegroundColor Red
@@ -165,7 +167,7 @@ function Invoke-Stage($Name, $ScriptName, $ScriptArgs, $Kind, $StateDir) {
     $note = ''
     if ($Kind -eq 'perfile') { $env:ARCH_CONTINUE_ON_ERROR = '1' }
     try {
-        & $path @ScriptArgs
+        & $path @Params
         $code = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }
     } catch {
         $code = 1
@@ -195,17 +197,12 @@ function Invoke-Stage($Name, $ScriptName, $ScriptArgs, $Kind, $StateDir) {
     Write-Host ("STAGE OK: {0}  ({1})" -f $Name, (Format-Duration $dur)) -ForegroundColor Green
 }
 
-# --- resolve backend + common args --------------------------------
+# --- resolve backend ----------------------------------------------
 
 $script:backend = Get-EnvVal 'LLM_BACKEND'; if (-not $script:backend) { $script:backend = 'ollama' }
 $script:model   = if ($script:backend -eq 'claude') { Get-EnvVal 'CLAUDE_MODEL' } else { Get-EnvVal 'LLM_DEFAULT_MODEL' }
 if (-not $script:model) { $script:model = '(default)' }
 
-$presetArg = if ($Preset)     { @('-Preset', $Preset) } else { @() }
-$jobsArg   = if ($Jobs -gt 0) { @('-Jobs', $Jobs) }     else { @() }
-$topArg    = if ($Top -gt 0)  { @('-Top', $Top) }       else { @() }
-$claudeArg = if ($Claude1)    { @('-Claude1') }         else { @() }
-$tdArg     = @('-TargetDir', $TargetDir)
 $archState = Join-Path $archDir '.archgen_state'
 $pass2St   = Join-Path $archDir '.pass2_state'
 
@@ -216,21 +213,41 @@ Write-Host "Backend / model: $script:backend / $script:model"
 Write-Host "Target:          $TargetDir"
 Write-Host "Report:          $ReportPath"
 
-# --- run stages in order ------------------------------------------
+# --- run stages in order (hashtable splat = named binding) ---------
 
 if (-not $SkipSerena) {
-    Invoke-Stage 'serena_extract (LSP)' 'serena_extract.ps1' ($presetArg + $tdArg + @('-Workers', 2, '-Jobs', 2)) 'free' ''
+    $p = @{ TargetDir = $TargetDir; EnvFile = $EnvFile; Workers = 2; Jobs = 2 }
+    if ($Preset) { $p.Preset = $Preset }
+    Invoke-Stage 'serena_extract (LSP)' 'serena_extract.ps1' $p 'free' ''
 }
 if ($script:backend -eq 'claude') {
-    Invoke-Stage 'archgen_dirs (dir overviews)' 'archgen_dirs.ps1' ($presetArg + $tdArg + $claudeArg) 'free' ''
+    $p = @{ TargetDir = $TargetDir; EnvFile = $EnvFile }
+    if ($Preset)  { $p.Preset = $Preset }
+    if ($Claude1) { $p.Claude1 = $true }
+    Invoke-Stage 'archgen_dirs (dir overviews)' 'archgen_dirs.ps1' $p 'free' ''
 }
-Invoke-Stage 'archgen (Pass 1)'    'archgen.ps1'          ($presetArg + $tdArg + $jobsArg + $claudeArg) 'perfile' $archState
-Invoke-Stage 'archxref'            'archxref.ps1'         $tdArg 'free' ''
-Invoke-Stage 'archgraph'           'archgraph.ps1'        $tdArg 'free' ''
-Invoke-Stage 'arch_overview'       'arch_overview.ps1'    $tdArg 'free' ''
-Invoke-Stage 'archpass2_context'   'archpass2_context.ps1' $tdArg 'free' ''
+
+$p = @{ TargetDir = $TargetDir; EnvFile = $EnvFile }
+if ($Preset)     { $p.Preset = $Preset }
+if ($Jobs -gt 0) { $p.Jobs = $Jobs }
+if ($Claude1)    { $p.Claude1 = $true }
+Invoke-Stage 'archgen (Pass 1)' 'archgen.ps1' $p 'perfile' $archState
+
+Invoke-Stage 'archxref'          'archxref.ps1'          @{ TargetDir = $TargetDir; EnvFile = $EnvFile } 'free' ''
+Invoke-Stage 'archgraph'         'archgraph.ps1'         @{ TargetDir = $TargetDir; EnvFile = $EnvFile } 'free' ''
+
+$p = @{ TargetDir = $TargetDir; EnvFile = $EnvFile }
+if ($Claude1) { $p.Claude1 = $true }
+Invoke-Stage 'arch_overview'     'arch_overview.ps1'     $p 'free' ''
+
+Invoke-Stage 'archpass2_context' 'archpass2_context.ps1' @{ TargetDir = $TargetDir; EnvFile = $EnvFile } 'free' ''
+
 if (-not $SkipPass2) {
-    Invoke-Stage 'archpass2 (Pass 2)' 'archpass2.ps1' ($tdArg + $jobsArg + $topArg + $claudeArg) 'perfile' $pass2St
+    $p = @{ TargetDir = $TargetDir; EnvFile = $EnvFile }
+    if ($Jobs -gt 0) { $p.Jobs = $Jobs }
+    if ($Top -gt 0)  { $p.Top = $Top }
+    if ($Claude1)    { $p.Claude1 = $true }
+    Invoke-Stage 'archpass2 (Pass 2)' 'archpass2.ps1' $p 'perfile' $pass2St
 }
 
 Write-RunReport 'SUCCESS - all stages completed'
