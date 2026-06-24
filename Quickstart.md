@@ -23,6 +23,18 @@ Run in order. Steps marked *free* make zero LLM calls.
 
 ---
 
+## One command (orchestrator)
+
+Run the whole pipeline and get a report:
+
+```powershell
+.\llm_scripts\run_pipeline.ps1 -Preset unreal -TargetDir Engine/Source/Runtime/RHI -Jobs 1 -Top 40
+```
+
+Runs every stage in order, writes **`Run Report.md`** (in `architecture/`), and **stops after any stage with failures** — completing that stage first, then listing the failed files + reasons. Use `-SkipSerena` / `-SkipPass2` to skip those stages.
+
+---
+
 ## Minimal Setup
 
 ```powershell

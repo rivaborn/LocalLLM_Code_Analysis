@@ -81,6 +81,16 @@ All scripts live in `llm_scripts/` and are run from the codebase root as `.\llm_
 
 Step 0 is optional but recommended for C/C++ codebases with a `compile_commands.json`. Step 0b generates directory-level overviews used as context in Step 1. Steps 2, 3, 4b are always free. Step 1 auto-skips generated/trivial files (configurable) and pre-computes shared directory headers. Step 4 is incremental by default (unchanged subsystems skip; use `-Full` to force). Step 5 with `-Top N` processes only the most important files.
 
+### Run the whole pipeline — run_pipeline.ps1
+
+To run all stages end-to-end, use the orchestrator:
+
+```powershell
+.\llm_scripts\run_pipeline.ps1 -Preset unreal -TargetDir Engine/Source/Runtime/RHI -Jobs 1 -Top 40
+```
+
+It runs each stage in order, writes **`Run Report.md`** (default `architecture/Run Report.md`) with a per-stage status/duration/counts table and a failures table, and **stops after the first stage that has failures** — completing that stage, then listing the failed files + reasons. Backend-aware (skips Step 0b on non-claude). Use `-SkipSerena` / `-SkipPass2` to skip those stages.
+
 ### Token Optimizations (Built-In)
 
 The 9 optimizations below are the always-on / Pass-1 built-in subset, which alone reduces Pass-1 API cost by up to ~72%. They are a subset of the full set documented in `Optimizations.md` (27 optimizations across v1-v3, ~95% total reduction):

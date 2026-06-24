@@ -534,9 +534,15 @@ while ($true) {
         # All stages exhausted — log and fail
         $errEntry = "====`nTimestamp: $(Get-Date -Format u)`nFile: $rel`nType: TOO_LONG (all $maxStage stages exhausted)`n----`n$respText`n"
         [System.IO.File]::AppendAllText($errorLog, $errEntry)
+        Update-Counter $counterPath "fail"
+        if ($env:ARCH_CONTINUE_ON_ERROR) {
+            # Orchestrated run: record the failure and keep going so the stage completes.
+            $failsFile = Join-Path (Split-Path $errorLog -Parent) 'failures.tsv'
+            [System.IO.File]::AppendAllText($failsFile, "$rel`tTOO_LONG`tPrompt too long after all fallback stages (degrade/truncation exhausted)`n")
+            exit 0
+        }
         "Prompt too long after all fallback stages: $rel" | Set-Content $fatalMsg -Encoding UTF8
         "fatal" | Set-Content $fatalFlag -Encoding UTF8
-        Update-Counter $counterPath "fail"
         exit 1
     }
 
@@ -571,9 +577,16 @@ while ($true) {
 
     $errEntry = "====`nTimestamp: $(Get-Date -Format u)`nFile: $rel`nExit: $exitCode`nType: PERSISTENT_FAILURE`n----`n$respText`n"
     [System.IO.File]::AppendAllText($errorLog, $errEntry)
+    Update-Counter $counterPath "fail"
+    if ($env:ARCH_CONTINUE_ON_ERROR) {
+        # Orchestrated run: record the failure and keep going so the stage completes.
+        $failsFile = Join-Path (Split-Path $errorLog -Parent) 'failures.tsv'
+        $reason = ([string]$respText -replace '\s+',' ').Trim(); if ($reason.Length -gt 200) { $reason = $reason.Substring(0,200) }
+        [System.IO.File]::AppendAllText($failsFile, "$rel`tPERSISTENT_FAILURE`t$reason`n")
+        exit 0
+    }
     "Claude failed after $attempt attempts on: $rel" | Set-Content $fatalMsg -Encoding UTF8
     "fatal" | Set-Content $fatalFlag -Encoding UTF8
-    Update-Counter $counterPath "fail"
     exit 1
 }
 # Write output and record hash

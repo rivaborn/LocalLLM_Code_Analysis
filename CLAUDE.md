@@ -50,6 +50,15 @@ Useful options:
 - `archpass2.ps1 -ScoreOnly` prints scores without running; `-Only <paths>` processes specific files
 - `serena_extract.ps1`: **Workers** = clangd processes, **Jobs** = `-j` threads each. 32 GB sweet spot is `-Workers 2 -Jobs 2` (more workers cause I/O contention, not speedup)
 
+## Full-pipeline orchestrator
+
+`run_pipeline.ps1` runs the whole pipeline end-to-end and writes a **`Run Report.md`** (default `architecture/Run Report.md`). It runs each stage in order and **stops after the first stage that has failures** — it completes that stage, lists the failed files + reasons in the report, then exits without running later stages. It's backend-aware (skips Step 0b on local) and sets `ARCH_CONTINUE_ON_ERROR` so `archgen`/`archpass2` record failing files to `<state>/failures.tsv` instead of fatal-aborting mid-stage.
+
+```powershell
+.\llm_scripts\run_pipeline.ps1 -Preset unreal -TargetDir Engine/Source/Runtime/RHI -Jobs 1 -Top 40
+# -SkipSerena if LSP context already extracted; -SkipPass2 to stop after the overview
+```
+
 ## Outputs
 
 Everything lands under `architecture/` (excluded from analysis):

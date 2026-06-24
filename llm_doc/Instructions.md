@@ -41,6 +41,14 @@ Step 5:          archpass2.ps1           → per-file .pass2.md docs (selective)
 
 Step 0 is optional. Step 0b generates directory-level overviews used as context in Step 1. Steps 2-3 can run in either order. Step 4 is incremental by default (unchanged subsystems skip; use `-Full` to force). Step 4b is optional but saves significant tokens in Step 5. Step 5 requires steps 1, 2, and 4.
 
+### Orchestrator — run_pipeline.ps1
+
+Runs every stage above in order, writes **`Run Report.md`** (default `architecture/Run Report.md`), and **stops after the first stage with failures** (it completes that stage, lists the failed files + reasons in the report, then exits). Backend-aware (skips Step 0b on non-claude). Flags: `-TargetDir`, `-Preset`, `-Jobs`, `-Top`, `-Claude1`, `-SkipSerena`, `-SkipPass2`, `-EnvFile`, `-ReportPath`.
+
+```powershell
+.\llm_scripts\run_pipeline.ps1 -Preset unreal -TargetDir Engine/Source/Runtime/RHI -Jobs 1 -Top 40
+```
+
 ---
 
 ## 2. serena_extract.ps1 — LSP Context Extraction

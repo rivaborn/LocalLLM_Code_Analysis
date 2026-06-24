@@ -344,9 +344,15 @@ while ($true) {
             continue
         }
         Write-ErrorLog $errorLog 'TOO_LONG (all stages exhausted)' $rel $exitCode $stdoutText $stderrText
+        Update-Counter $counterPath "fail"
+        if ($env:ARCH_CONTINUE_ON_ERROR) {
+            # Orchestrated run: record the failure and keep going so the stage completes.
+            $failsFile = Join-Path (Split-Path $errorLog -Parent) 'failures.tsv'
+            [System.IO.File]::AppendAllText($failsFile, "$rel`tTOO_LONG`tPrompt too long after all fallback stages (degrade/truncation exhausted)`n")
+            exit 0
+        }
         "Prompt too long after all fallback stages: $rel" | Set-Content $fatalMsg -Encoding UTF8
         "fatal" | Set-Content $fatalFlag -Encoding UTF8
-        Update-Counter $counterPath "fail"
         exit 1
     }
 
@@ -378,9 +384,16 @@ while ($true) {
     }
 
     Write-ErrorLog $errorLog 'PERSISTENT_FAILURE' $rel $exitCode $stdoutText $stderrText
+    Update-Counter $counterPath "fail"
+    if ($env:ARCH_CONTINUE_ON_ERROR) {
+        # Orchestrated run: record the failure and keep going so the stage completes.
+        $failsFile = Join-Path (Split-Path $errorLog -Parent) 'failures.tsv'
+        $reason = ([string]$respText -replace '\s+',' ').Trim(); if ($reason.Length -gt 200) { $reason = $reason.Substring(0,200) }
+        [System.IO.File]::AppendAllText($failsFile, "$rel`tPERSISTENT_FAILURE`t$reason`n")
+        exit 0
+    }
     "Claude failed after $attempt attempts on: $rel`nSee error log for exact output." | Set-Content $fatalMsg -Encoding UTF8
     "fatal" | Set-Content $fatalFlag -Encoding UTF8
-    Update-Counter $counterPath "fail"
     exit 1
 }
 
