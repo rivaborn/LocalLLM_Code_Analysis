@@ -465,6 +465,20 @@ if ($llmBackend -eq 'claude') {
     if (-not (Test-Path $claudeCfgDir)) { Write-Host "Claude config dir not found: $claudeCfgDir" -ForegroundColor Red; exit 2 }
 }
 
+# Degrade fallback (local backends only): escalate a degrading file to this claude model with
+# the full payload instead of emitting a truncated doc, then continue locally. Empty = disabled.
+$degradeFallbackModel = Cfg $cfg 'DEGRADE_FALLBACK_MODEL' ''
+if ($llmBackend -eq 'claude') {
+    $degradeFallbackModel = ''
+} elseif ($degradeFallbackModel -ne '') {
+    if (-not $claudeCfgDir -or -not (Test-Path $claudeCfgDir)) {
+        Write-Host "DEGRADE_FALLBACK_MODEL='$degradeFallbackModel' set but $cfgDirKey missing/invalid -- disabling claude fallback" -ForegroundColor Yellow
+        $degradeFallbackModel = ''
+    } else {
+        Write-Host "Degrade fallback:  local failures escalate to claude '$degradeFallbackModel'" -ForegroundColor Cyan
+    }
+}
+
 $account = if ($Claude1) { 'claude1' } else { 'claude2' }
 
 # Check prerequisites - look for subsystem-prefixed files first, then fall back to root files
@@ -799,7 +813,7 @@ foreach ($rel in $queue) {
         $fatalFlag, $fatalMsg, $errorLog, $rateLimitFile,
         $archContext, $xrefContext,
         $llmBackend, $llmEndpoint, $llmModel, $llmTemp, $llmMaxTokens, $llmTimeout, $llmNumCtx,
-        $llmThink, $PSScriptRoot
+        $llmThink, $PSScriptRoot, $degradeFallbackModel
     $running.Add($j) | Out-Null
 }
 
