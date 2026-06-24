@@ -674,8 +674,13 @@ Write-Host "  archpass2.ps1 - Second-Pass Analysis"     -ForegroundColor Yellow
 Write-Host "============================================" -ForegroundColor Yellow
 Write-Host "Repo root:    $repoRoot"
 Write-Host "Codebase:     $codebaseDesc"
-Write-Host "Account:      $account"
-Write-Host "Model:        $model"
+if ($llmBackend -eq 'claude') {
+    Write-Host "Account:      $account"
+    Write-Host "Model:        $model"
+} else {
+    Write-Host "Backend:      $llmBackend"
+    Write-Host "Model:        $llmModel"
+}
 Write-Host "Jobs:         $jobCount"
 $modeStr = if ($Top -gt 0) { "SELECTIVE (top $Top)" } else { "ALL" }
 if ($Delta) { $modeStr += " + DELTA" }

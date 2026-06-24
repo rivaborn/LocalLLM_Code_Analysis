@@ -870,8 +870,13 @@ Write-Host "============================================" -ForegroundColor Yello
 Write-Host "  arch_overview.ps1 - Architecture Overview" -ForegroundColor Yellow
 Write-Host "============================================" -ForegroundColor Yellow
 Write-Host "Codebase:       $codebaseDesc"
-Write-Host "Account:        $account"
-Write-Host "Model:          $model"
+if ($llmBackend -eq 'claude') {
+    Write-Host "Account:        $account"
+    Write-Host "Model:          $model"
+} else {
+    Write-Host "Backend:        $llmBackend"
+    Write-Host "Model:          $llmModel"
+}
 Write-Host "Target:         $TargetDir"
 Write-Host "Mode:           $mode"
 Write-Host "Doc root:       $docRoot"

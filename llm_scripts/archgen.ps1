@@ -1337,7 +1337,11 @@ Write-Host "Repo root:       $repoRoot"
 Write-Host "Codebase:        $codebaseDesc"
 if ($presetName) { Write-Host "Preset:          $presetName" }
 Write-Host "Target:          $TargetDir"
-Write-Host "Account:         $account  |  Model: $model  |  Jobs: $jobCount"
+if ($llmBackend -eq 'claude') {
+    Write-Host "Account:         $account  |  Model: $model  |  Jobs: $jobCount"
+} else {
+    Write-Host "Backend:         $llmBackend  |  Model: $llmModel  |  Jobs: $jobCount"
+}
 $hdrStatus   = if ($bundleHdrs -eq '1') { "ON (max $maxBundled)" } else { 'OFF' }
 $linesStatus = if ($maxFileLines -gt 0) { "$maxFileLines lines max" } else { 'unlimited' }
 Write-Host "Headers:         $hdrStatus  |  Max lines: $linesStatus"
