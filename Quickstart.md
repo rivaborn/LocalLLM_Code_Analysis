@@ -40,7 +40,7 @@ PRESET=unreal
 .\llm_scripts\archxref.ps1
 .\llm_scripts\archgraph.ps1
 .\llm_scripts\arch_overview.ps1
-.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8
+.\llm_scripts\archpass2.ps1 -Jobs 8
 ```
 
 ---
@@ -57,7 +57,7 @@ Requires: `compile_commands.json` + clangd with built index.
 .\llm_scripts\archgraph.ps1
 .\llm_scripts\arch_overview.ps1               # Incremental by default
 .\llm_scripts\archpass2_context.ps1                           # Free: targeted context
-.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500  # Selective Pass 2
+.\llm_scripts\archpass2.ps1 -Jobs 8 -Top 500  # Selective Pass 2
 ```
 
 ---
@@ -230,18 +230,19 @@ Set `TIERED_MODEL=0` in `.env` to disable auto-upgrade (everything uses `CLAUDE_
 
 ### Backend
 
-| Variable              | Default            | Description                                                  |
-|-----------------------|--------------------|-------------------------------------------------------------|
-| `LLM_BACKEND`         | `ollama`           | LLM backend: `ollama` / `vllm` / `claude`                   |
-| `LLM_HOST`            | `192.168.1.40`     | Host for ollama/vllm backends                               |
-| `LLM_PORT`            | `11434`            | Ollama port (vllm uses the gateway URL)                     |
-| `LLM_ENDPOINT`        | *(derived)*        | Full-URL override for the backend endpoint                  |
-| `LLM_DEFAULT_MODEL`   | `qwen3.6:27B`      | Model id (ollama tag `name:tag`, vllm served-name)          |
-| `LLM_THINK`           | `true`             | Enable thinking mode (ollama thinking models)               |
-| `LLM_NUM_CTX`         | `32768`            | Context window (ollama `/api/chat`)                         |
-| `LLM_TEMPERATURE`     | `0.2`              | Sampling temperature                                        |
-| `LLM_MAX_TOKENS`      | *(per stage)*      | Output token budget for local backends                      |
-| `LLM_TIMEOUT`         | *(seconds)*        | Per-request timeout                                         |
+| Variable                 | Default         | Description                                                  |
+|--------------------------|-----------------|-------------------------------------------------------------|
+| `LLM_BACKEND`            | `ollama`        | LLM backend: `ollama` / `vllm` / `claude`                   |
+| `LLM_HOST`               | `192.168.1.40`  | Host for ollama/vllm backends                               |
+| `LLM_PORT`               | `11434`         | Ollama port (vllm uses the gateway URL)                     |
+| `LLM_ENDPOINT`           | *(derived)*     | Full-URL override for the backend endpoint                  |
+| `LLM_DEFAULT_MODEL`      | `qwen3.6:27B`   | Model id (ollama tag `name:tag`, vllm served-name)          |
+| `LLM_THINK`              | `true`          | Enable thinking mode (ollama thinking models)               |
+| `LLM_NUM_CTX`            | `32768`         | Context window (ollama `/api/chat`)                         |
+| `LLM_TEMPERATURE`        | `0.2`           | Sampling temperature                                        |
+| `LLM_MAX_TOKENS`         | *(per stage)*   | Output token budget for local backends                      |
+| `LLM_TIMEOUT`            | *(seconds)*     | Per-request timeout                                         |
+| `DEGRADE_FALLBACK_MODEL` | *(empty)*       | local backends — escalate a degrading file to this claude model (needs valid CLAUDE*_CONFIG_DIR); empty = disabled |
 
 ### Required (claude backend only)
 

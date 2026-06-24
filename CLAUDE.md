@@ -40,7 +40,7 @@ Run from the repo root (PowerShell). Scripts read `.env`; `-Preset unreal` and `
 .\llm_scripts\archgraph.ps1                                          # free; Mermaid call graphs
 .\llm_scripts\arch_overview.ps1                                      # subsystem synthesis (sonnet, incremental)
 .\llm_scripts\archpass2_context.ps1                                  # free; targeted Pass 2 context
-.\llm_scripts\archpass2.ps1      -Preset unreal -Jobs 8 -Top 500    # selective Pass 2 (highest-scoring files)
+.\llm_scripts\archpass2.ps1 -Jobs 8 -Top 500    # selective Pass 2 (highest-scoring files)
 ```
 
 Useful options:
@@ -142,7 +142,7 @@ When `Get-Subsystems` encountered a directory with only 1 child (e.g., `Engine` 
 
 ## Token Optimizations
 
-28 optimizations documented in `llm_doc/Optimizations.md`, grouped v1-v4:
+27 optimizations documented in `llm_doc/Optimizations.md`, grouped v1-v4:
 - v1: 8 (skip trivial, shared headers, LSP trimming, targeted P2 context, tiered model, batch templates, compressed prompt, adaptive budget)
 - v2: 6 (batch small files, preamble, schema pruning, delta P2, source elision, pattern cache)
 - v3: 7 (max-tokens, dir-first analysis, LSP compression, JSON output, shared dir headers, incremental overview, classification)

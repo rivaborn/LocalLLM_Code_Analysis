@@ -301,6 +301,8 @@ Generates per-directory architectural overviews before Pass 1. Uses sonnet (tier
 .\llm_scripts\archgen_dirs.ps1
     [-TargetDir <string>]
     [-Preset <string>]
+    [-Claude1]
+    [-Clean]
     [-EnvFile <string>]
 ```
 
@@ -310,6 +312,8 @@ Generates per-directory architectural overviews before Pass 1. Uses sonnet (tier
 |--------------|--------|----------|-----------------------------------------------------------------------------|
 | `-TargetDir` | string | `"."`    | Subdirectory to scan. Use `"."` for entire repo.                            |
 | `-Preset`    | string | `""`     | Engine preset. Falls back to `PRESET` in `.env`. See [Presets](#14-presets). |
+| `-Claude1`   | switch | off      | Use account 1 (`CLAUDE1_CONFIG_DIR`) instead of account 2.                  |
+| `-Clean`     | switch | off      | Remove previous directory-overview output before generating.               |
 | `-EnvFile`   | string | `".env"` | Path to environment configuration file.                                     |
 
 ### Output
@@ -580,16 +584,16 @@ architecture/diagram_data.md                    — Extracted signal data for sy
 
 ```powershell
 # Auto-detect single vs chunked
-.\llm_scripts\arch_overview.ps1 -Preset unreal
+.\llm_scripts\arch_overview.ps1
 
 # Force chunked mode
-.\llm_scripts\arch_overview.ps1 -Preset unreal -Chunked
+.\llm_scripts\arch_overview.ps1 -Chunked
 
 # Single subsystem overview
 .\llm_scripts\arch_overview.ps1 -TargetDir Engine\Source\Runtime\Renderer
 
 # Clean and regenerate
-.\llm_scripts\arch_overview.ps1 -Preset unreal -Clean
+.\llm_scripts\arch_overview.ps1 -Clean
 ```
 
 ---
@@ -721,13 +725,13 @@ architecture/.pass2_state/ratelimit_resume.txt     — Shared rate-limit pause
 
 ```powershell
 # Process all files (original behavior)
-.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8
+.\llm_scripts\archpass2.ps1 -Jobs 8
 
 # Selective: top 500 highest-scoring files
-.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500
+.\llm_scripts\archpass2.ps1 -Jobs 8 -Top 500
 
 # Preview scores without running
-.\llm_scripts\archpass2.ps1 -Preset unreal -Top 500 -ScoreOnly
+.\llm_scripts\archpass2.ps1 -Top 500 -ScoreOnly
 
 # Manual file selection
 .\llm_scripts\archpass2.ps1 -Only "Engine/Source/Runtime/Engine/Private/Actor.cpp,Engine/Source/Runtime/CoreUObject/Private/UObject/UObjectBase.cpp"
@@ -736,10 +740,10 @@ architecture/.pass2_state/ratelimit_resume.txt     — Shared rate-limit pause
 .\llm_scripts\archpass2.ps1 -TargetDir Engine\Source\Runtime\Renderer -Jobs 4
 
 # Clean Pass 2 output and regenerate
-.\llm_scripts\archpass2.ps1 -Preset unreal -Clean -Jobs 8
+.\llm_scripts\archpass2.ps1 -Clean -Jobs 8
 
 # Using account 1
-.\llm_scripts\archpass2.ps1 -Preset unreal -Claude1 -Jobs 8
+.\llm_scripts\archpass2.ps1 -Claude1 -Jobs 8
 ```
 
 ---
@@ -905,6 +909,7 @@ All variables are optional. Set these in a `.env` file at the repo root.
 | `USE_MAX_TOKENS`        | `0`      | Hard output cap: maps adaptive budget to `--max-tokens` on Claude CLI. Also via `-MaxTokens` flag on `archgen.ps1`.                                                                                         |
 | `JSON_OUTPUT`           | `0`      | Switches `archgen.ps1` output format to JSON. Also via `-JsonOutput` flag.                                                                                                                                   |
 | `CLASSIFY_FILES`        | `0`      | Two-phase classification: ultra-cheap haiku call classifies files as ANALYZE or STUB before full analysis. Also via `-Classify` flag on `archgen.ps1`.                                                       |
+| `DEGRADE_FALLBACK_MODEL` | *(empty)* | Local backends only: when a file hits the degrade path, escalate it once to this claude model (e.g. `sonnet`) with the full payload, then continue locally. Needs a valid `CLAUDE*_CONFIG_DIR`; ignored on the `claude` backend. |
 
 ### Prompt Selection
 
@@ -980,7 +985,7 @@ For codebases under ~500 files where LSP setup isn't worth the effort:
 .\llm_scripts\archxref.ps1
 .\llm_scripts\archgraph.ps1
 .\llm_scripts\arch_overview.ps1
-.\llm_scripts\archpass2.ps1 -Preset quake -Jobs 8
+.\llm_scripts\archpass2.ps1 -Jobs 8
 ```
 
 ### Large C++ Codebase (With LSP, Full Optimizations)
@@ -993,9 +998,9 @@ For codebases with `compile_commands.json` and a built clangd index. All optimiz
 .\llm_scripts\archgen.ps1 -Preset unreal -Jobs 8                       # Auto-skips trivial, injects LSP + dir context + shared headers
 .\llm_scripts\archxref.ps1
 .\llm_scripts\archgraph.ps1
-.\llm_scripts\arch_overview.ps1 -Preset unreal                         # Incremental by default
+.\llm_scripts\arch_overview.ps1                                        # Incremental by default
 .\llm_scripts\archpass2_context.ps1                                     # Free: targeted context
-.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500            # Selective, targeted context
+.\llm_scripts\archpass2.ps1 -Jobs 8 -Top 500                           # Selective, targeted context
 ```
 
 ### Single Subsystem Deep-Dive
@@ -1029,7 +1034,7 @@ Use the learning prompt for educational documentation:
 See which files would be selected before committing to a run:
 
 ```powershell
-.\llm_scripts\archpass2.ps1 -Preset unreal -Top 200 -ScoreOnly
+.\llm_scripts\archpass2.ps1 -Top 200 -ScoreOnly
 ```
 
 ### Resume After Rate Limit
@@ -1052,9 +1057,13 @@ Remove-Item architecture\.archgen_state\ratelimit_resume.txt -ErrorAction Silent
 ### Clean Start
 
 ```powershell
-# Remove ALL output (Pass 1, Pass 2, xref, overview, diagrams, state)
+# Clear only Pass 1 output and state; preserves .serena_context/, .dir_context/, .dir_headers/
 .\llm_scripts\archgen.ps1 -Clean
 
 # Remove only Pass 2 output and state
 .\llm_scripts\archpass2.ps1 -Clean
 ```
+
+### Self-Tests
+
+Every `.ps1` script accepts a `-Test` switch, which runs that script's in-file unit-test suite and exits without doing any real work (no Claude/LLM calls, no output generation).

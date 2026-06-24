@@ -85,6 +85,8 @@ TOTAL                          772
 
 ## Per-Script Test Details
 
+*The per-function figures below are indicative; the per-script header counts and the TOTAL (772) are authoritative (verified by running each suite).*
+
 ### serena_extract.ps1 (50 tests)
 
 ```powershell

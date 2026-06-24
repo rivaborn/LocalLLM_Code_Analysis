@@ -36,7 +36,7 @@ copy .env.example .env        # then fill in CLAUDE1/2_CONFIG_DIR (only needed f
 .\llm_scripts\archxref.ps1
 .\llm_scripts\archgraph.ps1
 .\llm_scripts\arch_overview.ps1
-.\llm_scripts\archpass2.ps1      -Preset unreal -Jobs 8 -Top 500
+.\llm_scripts\archpass2.ps1 -Jobs 8 -Top 500
 ```
 
 Scope any script to a subtree with `-TargetDir <path>`.
@@ -48,6 +48,8 @@ Scope any script to a subtree with `-TargetDir <path>`.
 - **`ollama`** (default) — raw Ollama server (`http://<LLM_HOST>:11434`), serving `qwen3.6:27B` (a thinking model; reasoning is kept out of the doc via the native `/api/chat` path + `LLM_THINK=true`).
 - **`vllm`** — LLMConfig OpenAI `/v1` gateway (`http://<LLM_HOST>:11430`); auto-loads the model, fast. Use a non-thinking served-name like `qwen3-coder-30b`.
 - **`claude`** — the `claude` CLI (haiku/sonnet via the `CLAUDE_*` keys); the only backend needing `CLAUDE*_CONFIG_DIR`.
+
+On the local backends, files that hit the degrade path are escalated once to a named claude model when `DEGRADE_FALLBACK_MODEL` is set (empty = disabled).
 
 See `llm_scripts/llm_core.ps1` for the implementation and `.env.example` for all keys.
 

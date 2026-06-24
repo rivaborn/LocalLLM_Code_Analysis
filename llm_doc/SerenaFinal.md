@@ -20,7 +20,7 @@ This document is the definitive summary of the entire multi-session effort to in
 12. [Quake 2 Rerelease DLL Configuration](#12-quake-2-rerelease-dll-configuration)
 13. [Complete Working Configuration Files](#13-complete-working-configuration-files)
 14. [Outstanding Issues](#14-outstanding-issues)
-15. [Lessons Learned](#15-lessons-learned) — 29 lessons across UE, clangd, LSP extraction, token optimization, and tooling
+15. [Lessons Learned](#15-lessons-learned) — 34 lessons across UE, clangd, LSP extraction, token optimization, and tooling
 16. [Quick Reference Commands](#16-quick-reference-commands)
 
 ---
@@ -80,7 +80,7 @@ The archgen toolchain is a set of PowerShell scripts (in `llm_scripts/`) that us
 - **Header bundling:** Pass 1 bundles local `#include` headers as additional context (configurable max count). With `BUNDLE_HEADER_DOCS=1`, bundles the analyzed doc (~400 tokens) instead of raw source (~4000 tokens).
 - **Chunking:** Overview stage automatically chunks large codebases to stay within context limits.
 - **Adaptive parallel extraction:** LSP extraction auto-scales clangd instances based on available RAM, scaling up when resources free and down when tight.
-- **Token optimizations:** 8 built-in optimizations (trivial file skipping, adaptive output budget, LSP-guided source trimming, tiered model selection, header doc bundling, batch templated files, compressed prompt, targeted Pass 2 context) can reduce total LLM cost by up to ~72%. See `Optimization.md`.
+- **Token optimizations:** 8 built-in optimizations (trivial file skipping, adaptive output budget, LSP-guided source trimming, tiered model selection, header doc bundling, batch templated files, compressed prompt, targeted Pass 2 context) can reduce total LLM cost by up to ~72%. See `Optimizations.md`.
 
 ### 3.3 Prompt Files
 
@@ -93,6 +93,11 @@ Prompt templates live in `llm_prompts/`.
 | `file_doc_prompt_compact.txt`  | Compressed prompt (~150 tokens) — same schema, terse format. Saves ~350 tokens per call.                                                                                 |
 | `file_doc_prompt_learn.txt`    | Learning-oriented variant — adds "Why This File Exists", prerequisites, design patterns, historical context, study questions                                              |
 | `file_doc_prompt_pass2.txt`    | Pass 2 enrichment — architectural role, cross-references (incoming/outgoing), design patterns and rationale, data flow, learning notes, potential issues                   |
+| `file_doc_prompt_minimal.txt`  | Pruned schema for simple files (<100 lines, ≤3 symbols) — outputs only non-empty sections (Purpose, Functions, Deps), ~200 token cap                                       |
+| `file_doc_prompt_pass2_delta.txt` | Delta-only Pass 2 — emits ONLY new insights not already in the Pass 1 doc; empty output acceptable when Pass 1 was sufficient                                           |
+| `classify_prompt.txt`          | Two-phase ANALYZE/STUB classifier — ultra-cheap call deciding whether a file needs full analysis or just a stub doc                                                        |
+| `file_doc_system_prompt.txt`   | Fixed system prompt (identical across calls) enabling API-level prompt caching; per-file schema is embedded in the user message instead                                    |
+| `ue_preamble.txt`              | Engine-conventions preamble — compact UE idioms (UCLASS/UPROPERTY, FName/TArray/AActor, generated/Module files) injected once so the model doesn't re-explain them          |
 
 ---
 
@@ -655,13 +660,13 @@ cd C:\Coding\rivaborn\Codebases\Epic_Games\UnrealEngine
 .\llm_scripts\archgraph.ps1
 
 # 4. Architecture overview (incremental by default, chunked for UE)
-.\llm_scripts\arch_overview.ps1 -Preset unreal
+.\llm_scripts\arch_overview.ps1
 
 # 4b. Targeted per-file context for Pass 2 (instant, free)
 .\llm_scripts\archpass2_context.ps1
 
 # 5. Pass 2: selective re-analysis of highest-value files only
-.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500
+.\llm_scripts\archpass2.ps1 -Jobs 8 -Top 500
 ```
 
 Step 0 is free (zero LLM tokens, clangd only, ~9 hours at 3 workers for full UE). Step 0b generates directory overviews used as context in Step 1 (few LLM calls). Step 1 auto-skips trivial files and uses LSP + dir context + shared headers. Steps 2-4b are free. Step 4 is incremental (unchanged subsystems skip on re-run). Step 5 processes only the top 500 files with targeted context — a ~93% reduction in Pass 2 calls and ~50% reduction in per-call input tokens. (All LLM steps — 0b, 1, 4, 5 — use the configured `LLM_BACKEND`, default local Ollama `qwen3.6:27B`.)
@@ -699,8 +704,8 @@ cd <quake2-rerelease-dll repo root>
 .\llm_scripts\archgen.ps1 -TargetDir rerelease -Preset quake -Jobs 8
 .\llm_scripts\archxref.ps1
 .\llm_scripts\archgraph.ps1
-.\llm_scripts\arch_overview.ps1 -Preset quake
-.\llm_scripts\archpass2.ps1 -Preset quake -Jobs 8
+.\llm_scripts\arch_overview.ps1
+.\llm_scripts\archpass2.ps1 -Jobs 8
 ```
 
 ---
@@ -936,9 +941,9 @@ claude
 .\llm_scripts\archgen.ps1 -Preset unreal -Jobs 8               # Pass 1 (LSP + dir context + shared headers)
 .\llm_scripts\archxref.ps1                                      # Cross-references
 .\llm_scripts\archgraph.ps1                                     # Call graph diagrams
-.\llm_scripts\arch_overview.ps1 -Preset unreal                  # Overview (incremental by default)
+.\llm_scripts\arch_overview.ps1                  # Overview (incremental by default)
 .\llm_scripts\archpass2_context.ps1                              # Targeted Pass 2 context (free)
-.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500     # Pass 2 (selective, targeted context)
+.\llm_scripts\archpass2.ps1 -Jobs 8 -Top 500     # Pass 2 (selective, targeted context)
 ```
 
 ### Fast Extraction (Symbols Only)

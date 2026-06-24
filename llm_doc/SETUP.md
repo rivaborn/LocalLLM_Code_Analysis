@@ -83,7 +83,7 @@ Step 0 is optional but recommended for C/C++ codebases with a `compile_commands.
 
 ### Token Optimizations (Built-In)
 
-The pipeline includes 9 token optimizations that can reduce total API cost by up to 72%:
+The 9 optimizations below are the always-on / Pass-1 built-in subset, which alone reduces Pass-1 API cost by up to ~72%. They are a subset of the full set documented in `Optimizations.md` (27 optimizations across v1-v3, ~95% total reduction):
 
 | Optimization                      | Default                                    | .env Variable                                                |
 |-----------------------------------|--------------------------------------------|------------------------------------------------------------|
@@ -97,7 +97,18 @@ The pipeline includes 9 token optimizations that can reduce total API cost by up
 | LSP-guided source trimming        | **ON** (if LSP context has trimmed source)  | Always active                                                |
 | Prompt caching                    | **ON**                                     | Always active (fixed system prompt across all calls)         |
 
-See `Optimization.md` for detailed descriptions of each.
+See `Optimizations.md` for detailed descriptions of each.
+
+### Backend-Aware Prompt Policy (online keeps every optimization; local is lean)
+
+The optimizations above describe the `claude` backend, which keeps every optimization unchanged. On the non-`claude` (`ollama` / `vllm`) backends the toolkit deliberately minimizes the prompt, because local models choke on the big multi-file / multi-header prompts:
+
+- **`archgen.ps1`** force-disables header bundling, file/template batching, and the engine preamble; uses the COMPACT schema (`file_doc_prompt_compact.txt`); sends each file on its own with its injected LSP/serena context; and forces `Jobs=1` on the `ollama` backend.
+- **`archpass2.ps1`** drops the global `architecture.md` + `xref_index.md` context (it keeps the small per-file `.pass2_context`).
+- **`arch_overview.ps1`** caps the synthesis chunk threshold to 800 lines.
+- **`archgen_dirs.ps1`** (Step 0b) is claude-only — its `.dir_context` output is unused by the local Pass-1 prompt.
+
+All gating is by backend, so the `claude` path is unchanged.
 
 ---
 
@@ -146,15 +157,18 @@ The original `.sh` ports predate the local-LLM backend and assume the `claude` C
 
 ### Documentation
 
-| File                  | Purpose                                                  |
-|-----------------------|----------------------------------------------------------|
-| `SETUP.md`            | This file                                                |
-| `SerenaFinal.md`      | Complete technical reference for the Serena integration  |
-| `FileReference.md`    | Index of all files with descriptions                     |
-| `Optimization.md`     | Token optimization guide (v1/v2)                         |
-| `Optimizations v3.md` | v3 optimization documentation                            |
-| `Summary - 1.md`      | Session 1 troubleshooting summary                        |
-| `Summary - 2.md`      | Session 2 extended summary                               |
+| File                  | Purpose                                                          |
+|-----------------------|------------------------------------------------------------------|
+| `SETUP.md`            | This file                                                        |
+| `Instructions.md`     | Per-script CLI reference                                         |
+| `FileReference.md`    | Index of all files with descriptions                            |
+| `SerenaFinal.md`      | Complete technical reference for the Serena integration         |
+| `LSP Extraction.md`   | LSP-extraction technical reference                              |
+| `ModelComparison.md`  | Backend & prompt benchmark (accuracy + cost)                    |
+| `Optimizations.md`    | Token optimization guide (v1-v3)                               |
+| `UnitTests.md`        | Toolkit unit-test notes                                          |
+
+`Quickstart.md` (condensed reference) lives at the repo root, not in `llm_doc/`.
 
 ---
 
@@ -201,7 +215,7 @@ Copy-Item C:\path\to\toolkit\llm_doc\*.md llm_doc\ -ErrorAction SilentlyContinue
 Copy-Item C:\path\to\toolkit\llm_Dep\*.sh llm_Dep\ -ErrorAction SilentlyContinue
 
 # .env at the codebase root, then edit
-Copy-Item C:\path\to\toolkit\.env.template .env
+Copy-Item C:\path\to\toolkit\.env.example .env
 
 # Add to .gitignore
 Add-Content .gitignore "`n.env`narchitecture/"
@@ -272,8 +286,9 @@ Implemented in `llm_scripts/llm_core.ps1` (dot-sourced by every LLM-calling scri
 | `LLM_TEMPERATURE`    | `0.1`            | Sampling temperature                                                         |
 | `LLM_MAX_TOKENS`     | `1000`           | Max output tokens per call                                                   |
 | `LLM_TIMEOUT`        | `900`            | Per-call timeout in seconds                                                  |
-| `LLM_NUM_CTX`        | `32768`          | Context window (Ollama `/api/chat`)                                          |
-| `LLM_THINK`          | `true`           | Use native thinking mode (separates reasoning); for the Ollama thinking model |
+| `LLM_NUM_CTX`        | `0`              | Context window (Ollama `/api/chat`). Default `0` when unset, which disables the native `/api/chat` path; the unreal `.env` ships `32768`. |
+| `LLM_THINK`          | `false`          | Use native thinking mode (separates reasoning); for the Ollama thinking model. Default `false` when unset; the unreal `.env` ships `true`. |
+| `DEGRADE_FALLBACK_MODEL` | *(empty)*    | Local backends only. When a file hits the degrade path (thinking-exhaustion / empty-or-short output / context overflow) escalate THAT file once to this claude model with the full payload, then continue locally. Empty = disabled. Requires a valid `CLAUDE*_CONFIG_DIR` + claude CLI. |
 
 `arch_overview.ps1` and `archgen_dirs.ps1` use larger output budgets via `LLM_OVERVIEW_MAX_TOKENS` / `LLM_DIR_MAX_TOKENS`.
 
@@ -659,15 +674,23 @@ When no LSP context exists:
 - Standard `file_doc_prompt.txt` is used
 - Pipeline works exactly as before
 
-### Fallback Chain (Prompt Too Long)
+### Banner & Progress (local vs claude)
 
-If Claude returns "prompt too long", the worker degrades context in stages:
+On the local (`ollama` / `vllm`) backends the startup banner shows a `Backend: <backend> | Model: <llmModel>` line (instead of the `Account:` / `Model:` lines shown on the `claude` backend), and the progress line shows `model=<llmModel>` instead of the `haiku=%/sonnet=%` tiered split shown on `claude`.
+
+### Fallback Chain (degrade ladder)
+
+If the backend returns "prompt too long", the worker degrades context in stages:
 
 | Stage      | Source Content                             | Headers              | LSP Context |
 |------------|-------------------------------------------|----------------------|-------------|
 | 0 (normal) | Full or LSP-trimmed (up to MAX_FILE_LINES) | Bundled (raw or doc) | Injected    |
 | 1          | Full or LSP-trimmed                        | Dropped              | Injected    |
 | 2          | Truncated to 25% (head+tail)               | Dropped              | Dropped     |
+
+On the local (`ollama` / `vllm`) backends the degrade trigger fires more broadly: not only on a literal "prompt too long", but also on empty / short / garbled output, thinking-exhaustion, and context-overflow `400`s. If `DEGRADE_FALLBACK_MODEL` is set, the file is escalated once to that claude model with the **full payload** before the stage ladder advances; if that still fails (or the variable is empty), the local stage ladder above proceeds.
+
+Note (local = lean): on non-`claude` backends header bundling, file/template batching, and the engine preamble are force-disabled, the COMPACT schema is used, and `Jobs=1` is forced on `ollama` (see Section 1). The `claude` backend keeps every optimization unchanged.
 
 ### Output
 
@@ -719,10 +742,10 @@ Synthesizes all Pass 1 docs into a subsystem-level architecture overview. When `
 
 ```powershell
 # Auto-detects single vs chunked mode (incremental by default)
-.\llm_scripts\arch_overview.ps1 -Preset unreal
+.\llm_scripts\arch_overview.ps1
 
 # Force full regeneration (skip incremental)
-.\llm_scripts\arch_overview.ps1 -Preset unreal -Full
+.\llm_scripts\arch_overview.ps1 -Full
 ```
 
 ### Auto-Chunking
@@ -779,13 +802,13 @@ Re-analyzes source files with the architecture overview and cross-reference inde
 
 ```powershell
 # Process all files (original behavior)
-.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8
+.\llm_scripts\archpass2.ps1 -Jobs 8
 
 # Selective: only top 500 highest-scoring files
-.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500
+.\llm_scripts\archpass2.ps1 -Jobs 8 -Top 500
 
 # Preview scores without running
-.\llm_scripts\archpass2.ps1 -Preset unreal -Top 500 -ScoreOnly
+.\llm_scripts\archpass2.ps1 -Top 500 -ScoreOnly
 
 # Manual file selection
 .\llm_scripts\archpass2.ps1 -Only "Engine/Source/Runtime/Engine/Private/Actor.cpp,Engine/Source/Runtime/CoreUObject/Private/UObject/UObjectBase.cpp"
@@ -881,7 +904,7 @@ Short fixed system prompt (~6 lines, ~500 tokens) used by both `archgen_worker.p
 
 | Preset                        | Languages                         | Excludes                                           | Description                |
 |-------------------------------|-----------------------------------|----------------------------------------------------|----------------------------|
-| `quake` / `doom` / `idtech`   | `.c .h .cpp .hpp .inl .inc`       | `baseq2`, `base`, build dirs                       | id Software / Quake-family |
+| `quake` / `doom` / `idtech`   | `.c .h .cpp .hpp .inl .inc`       | `baseq2`, `baseq3`, `base`, build dirs             | id Software / Quake-family |
 | `unreal` / `ue4` / `ue5`     | `.cpp .h .hpp .cc .cxx .inl .cs`  | `Binaries`, `Intermediate`, `ThirdParty`, `Build`  | Unreal Engine 4/5          |
 | `godot`                       | `.cpp .h .gd .cs .tscn .tres`     | `.godot`, `.import`, build                         | Godot (C++, GDScript, C#)  |
 | `unity`                       | `.cs .shader .hlsl .cginc`        | `Library`, `Temp`, `Packages/com.unity`            | Unity (C#, shaders)        |
@@ -912,10 +935,10 @@ cd C:\path\to\quake2-rerelease-dll
 .\llm_scripts\archgraph.ps1
 
 # Step 4: Architecture overview
-.\llm_scripts\arch_overview.ps1 -Preset quake
+.\llm_scripts\arch_overview.ps1
 
 # Step 5: Context-aware re-analysis on key files
-.\llm_scripts\archpass2.ps1 -Preset quake -Jobs 8 -Only `
+.\llm_scripts\archpass2.ps1 -Jobs 8 -Only `
     "rerelease/g_main.cpp,rerelease/p_client.cpp,rerelease/g_combat.cpp"
 ```
 
@@ -982,13 +1005,13 @@ uv python install 3.12
 .\llm_scripts\archgraph.ps1
 
 # Step 4: Architecture overview (incremental by default, chunked for UE)
-.\llm_scripts\arch_overview.ps1 -Preset unreal
+.\llm_scripts\arch_overview.ps1
 
 # Step 4b: Targeted per-file context for Pass 2 (instant, free)
 .\llm_scripts\archpass2_context.ps1
 
 # Step 5: Selective Pass 2 (top 500 files only, uses targeted context)
-.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8 -Top 500
+.\llm_scripts\archpass2.ps1 -Jobs 8 -Top 500
 ```
 
 ### Subsystem-by-Subsystem Approach (Alternative)
@@ -1006,7 +1029,7 @@ For the first analysis, targeting one subsystem at a time is faster:
 
 # Then run xref/overview across everything analyzed so far
 .\llm_scripts\archxref.ps1
-.\llm_scripts\arch_overview.ps1 -Preset unreal
+.\llm_scripts\arch_overview.ps1
 ```
 
 ### Recommended Subsystem Order
@@ -1118,7 +1141,7 @@ If using two accounts, switch with `-Claude1` / default (account 2) when one is 
 
 ```powershell
 .\llm_scripts\archgen.ps1 -Preset unreal -Clean     # Removes ALL architecture output + state
-.\llm_scripts\archpass2.ps1 -Preset unreal -Clean    # Removes only Pass 2 output + state
+.\llm_scripts\archpass2.ps1 -Clean    # Removes only Pass 2 output + state
 ```
 
 ---
@@ -1138,9 +1161,9 @@ Run steps 1, 2, and 4 first:
 ```powershell
 .\llm_scripts\archgen.ps1 -Preset unreal -Jobs 8
 .\llm_scripts\archxref.ps1
-.\llm_scripts\arch_overview.ps1 -Preset unreal
+.\llm_scripts\arch_overview.ps1
 # Then:
-.\llm_scripts\archpass2.ps1 -Preset unreal -Jobs 8
+.\llm_scripts\archpass2.ps1 -Jobs 8
 ```
 
 ### clangd crashes / high memory

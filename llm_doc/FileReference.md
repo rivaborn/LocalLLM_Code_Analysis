@@ -108,11 +108,14 @@ Configures Serena's LSP integration: language (cpp), clangd arguments (`-j=4`, `
 
 ## Documentation (llm_doc/)
 
+### llm_doc/LSP Extraction.md — LSP Extraction Q&A Note
+Short Q&A note on running `serena_extract.ps1` standalone (the free Step 0 clangd extraction) and how the resulting `.serena_context.txt` LSP context feeds into `archgen.ps1` Pass 1.
+
 ### llm_doc/SerenaFinal.md — Complete Reference
 Definitive 16-section reference document covering the entire multi-session effort: project goals, environment, archgen toolchain, UE 5.7.3 setup, compile_commands.json generation, Serena installation/bugs, clangd configuration, overnight indexing results, Serena verification, pipeline integration (Serena-first design), Quake 2 config, working configuration files, outstanding issues, and lessons learned.
 
 ### llm_doc/Optimizations.md — Token Optimization Guide
-Single consolidated optimization document covering all 28 token optimization strategies (organized as v1-v4 sections within the one file) with implementation details, code examples, impact estimates, and prioritized order. Covers skip generated/trivial files, shared header analysis, LSP-guided source trimming, per-file targeted Pass 2 context, tiered model selection, directory-first analysis, shared directory headers, incremental overview, prompt caching, and more. Baseline ~250M tokens reduced to ~12M (95%) after v1-v3. Prompt-bloating optimizations are tagged online-only (the local backends get a minimized prompt).
+Single consolidated optimization document covering all 27 token optimization strategies (organized as v1-v4 sections within the one file) with implementation details, code examples, impact estimates, and prioritized order. Covers skip generated/trivial files, shared header analysis, LSP-guided source trimming, per-file targeted Pass 2 context, tiered model selection, directory-first analysis, shared directory headers, incremental overview, prompt caching, and more. Baseline ~250M tokens reduced to ~12M (95%) after v1-v3. Prompt-bloating optimizations are tagged online-only (the local backends get a minimized prompt).
 
 ### llm_doc/ModelComparison.md — Backend & Prompt Benchmark
 RHI/Public A/B comparing `claude` haiku, `vllm` qwen3-coder-30b, and `ollama` qwen3.6:27B (header-heavy vs minimized prompt). Documents the prompt-minimization validation (coverage 24 -> 64 docs, at parity with haiku), the per-file accuracy scorecard, the CoT-leakage check (0 leaks), the `RHIDefinitions.h` degrade case, cost analysis, and reproduction steps including the env-gated `ARCHGEN_DUMP_PROMPT` capture hook.
