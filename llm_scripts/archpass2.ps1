@@ -719,7 +719,13 @@ if ($llmBackend -ne 'claude') {
     $archContext = ''
     $xrefContext = ''
 }
-Write-Host "Loaded context: arch=$($archContext.Length) chars, xref=$($xrefContext.Length) chars"
+if ($llmBackend -eq 'claude') {
+    Write-Host "Loaded context: arch=$($archContext.Length) chars, xref=$($xrefContext.Length) chars"
+} else {
+    $p2ctxScope = if ($TargetDir -ne '.' -and $TargetDir -ne 'all') { Join-Path (Join-Path $archDir '.pass2_context') $TargetDir } else { Join-Path $archDir '.pass2_context' }
+    $p2ctxN = if (Test-Path $p2ctxScope) { @(Get-ChildItem $p2ctxScope -Filter *.ctx.txt -Recurse -ErrorAction SilentlyContinue).Count } else { 0 }
+    Write-Host "Loaded context: arch=0 chars, xref=0 chars (global dropped for local; per-file .pass2_context used by workers -- $p2ctxN files)"
+}
 
 # -- Counter file + worker script path ------------------------
 
