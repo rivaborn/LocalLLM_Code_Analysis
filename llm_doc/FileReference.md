@@ -126,12 +126,6 @@ Condensed quick-reference: pipeline order, minimal setup, per-script options, mo
 ### llm_doc/UnitTests.md — Unit Test Reference
 Coverage map and per-script test details for the toolkit's unit tests, plus how worker scripts are tested via AST extraction and what is not exercised.
 
-### llm_doc/Summary - 1.md — Initial Troubleshooting Summary
-First session summary covering the clangd crash, emergency `.clangd` config, and initial Serena setup.
-
-### llm_doc/Summary - 2.md — Extended Session Summary
-Second session summary covering archgen toolchain, Quake 2 config, Serena integration plan, UE setup details, and overnight indexing configuration.
-
 ### llm_doc/SETUP.md — Setup & Usage Guide
 Comprehensive guide covering pipeline diagram, prerequisites, LLM backend / multi-account setup, installation, `.env` configuration with token optimization variables, Serena/clangd setup, all pipeline steps with examples, prompt files, presets, full Quake 2 and Unreal Engine walkthroughs with time estimates, output directory structure, resumability, and troubleshooting.
 
