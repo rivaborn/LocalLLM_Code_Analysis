@@ -1434,11 +1434,16 @@ function Show-Progress {
             }
         } catch {}
 
-        $mTotal = $script:modelCounts.haiku + $script:modelCounts.sonnet
-        $hPct = if ($mTotal -gt 0) { [int][math]::Round(100 * $script:modelCounts.haiku / $mTotal) } else { 0 }
-        $sPct = 100 - $hPct
         $rlStatus = Get-RateLimitStatus $rateLimitFile
-        $line = "PROGRESS: $done/$toDo  skip=$($script:progressSkip)  fail=$fail  retries=$retries  rate=${rate}/s  eta=$eta  haiku=${hPct}% sonnet=${sPct}%$rlStatus"
+        if ($llmBackend -eq 'claude') {
+            $mTotal = $script:modelCounts.haiku + $script:modelCounts.sonnet
+            $hPct = if ($mTotal -gt 0) { [int][math]::Round(100 * $script:modelCounts.haiku / $mTotal) } else { 0 }
+            $sPct = 100 - $hPct
+            $modelStatus = "haiku=${hPct}% sonnet=${sPct}%"
+        } else {
+            $modelStatus = "model=$llmModel"
+        }
+        $line = "PROGRESS: $done/$toDo  skip=$($script:progressSkip)  fail=$fail  retries=$retries  rate=${rate}/s  eta=$eta  $modelStatus$rlStatus"
         [Console]::Write("`r" + $line.PadRight(100))
     } catch {
         # Debug: if progress fails, show why

@@ -771,9 +771,11 @@ foreach ($rel in $queue) {
                     $eta = if ($etaH -gt 0) { '{0}h{1:d2}m{2:d2}s' -f $etaH, $etaM, $etaS } else { '{0}m{1:d2}s' -f $etaM, $etaS }
                 } else { $eta = '?' }
                 $rlStatus = Get-RateLimitStatus $rateLimitFile
-                $hPct = if ($modelCounts.haiku + $modelCounts.sonnet -gt 0) { [int][math]::Round(100 * $modelCounts.haiku / ($modelCounts.haiku + $modelCounts.sonnet)) } else { 0 }
-                $sPct = 100 - $hPct
-                $line    = "PROGRESS: $($c.done)/$toDo  skip=$($c.skip)  fail=$($c.fail)  retries=$($c.retries)  rate=${rate}/s  eta=$eta  haiku=${hPct}% sonnet=${sPct}%$rlStatus"
+                if ($llmBackend -eq 'claude') {
+                    $hPct = if ($modelCounts.haiku + $modelCounts.sonnet -gt 0) { [int][math]::Round(100 * $modelCounts.haiku / ($modelCounts.haiku + $modelCounts.sonnet)) } else { 0 }
+                    $modelStatus = "haiku=${hPct}% sonnet=$((100 - $hPct))%"
+                } else { $modelStatus = "model=$llmModel" }
+                $line    = "PROGRESS: $($c.done)/$toDo  skip=$($c.skip)  fail=$($c.fail)  retries=$($c.retries)  rate=${rate}/s  eta=$eta  $modelStatus$rlStatus"
                 Write-Host "`r$line    " -NoNewline
             }
             Start-Sleep -Milliseconds 500
@@ -815,10 +817,12 @@ while ($running.Count -gt 0) {
             $rate    = if ($elapsed -gt 0 -and $c.done -gt 0) { [math]::Round($c.done / $elapsed, 2) } else { 0 }
             $remaining = $toDo - $c.done
             $eta     = if ($rate -gt 0) { [math]::Round($remaining / $rate) } else { '?' }
-            $hPct = if ($modelCounts.haiku + $modelCounts.sonnet -gt 0) { [int][math]::Round(100 * $modelCounts.haiku / ($modelCounts.haiku + $modelCounts.sonnet)) } else { 0 }
-            $sPct = 100 - $hPct
             $rlStatus = Get-RateLimitStatus $rateLimitFile
-            $line    = "PROGRESS: $($c.done)/$toDo  skip=$($c.skip)  fail=$($c.fail)  retries=$($c.retries)  rate=${rate}/s  eta=${eta}s  haiku=${hPct}% sonnet=${sPct}%$rlStatus"
+            if ($llmBackend -eq 'claude') {
+                $hPct = if ($modelCounts.haiku + $modelCounts.sonnet -gt 0) { [int][math]::Round(100 * $modelCounts.haiku / ($modelCounts.haiku + $modelCounts.sonnet)) } else { 0 }
+                $modelStatus = "haiku=${hPct}% sonnet=$((100 - $hPct))%"
+            } else { $modelStatus = "model=$llmModel" }
+            $line    = "PROGRESS: $($c.done)/$toDo  skip=$($c.skip)  fail=$($c.fail)  retries=$($c.retries)  rate=${rate}/s  eta=${eta}s  $modelStatus$rlStatus"
             Write-Host "`r$line    " -NoNewline
         }
         Start-Sleep -Milliseconds 500
