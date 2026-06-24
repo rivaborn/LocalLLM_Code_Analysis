@@ -323,6 +323,8 @@ architecture/
   .pass2_state/          ← Pass 2 state
 ```
 
+Project-specific files live at the analyzed codebase's root, not in the toolkit: `ANALYSIS_STATUS.md` (completed subsystems, doc counts, gaps) and `Analysis Map.md` (subsystem plan / `-TargetDir` paths).
+
 ---
 
 ## Resumability

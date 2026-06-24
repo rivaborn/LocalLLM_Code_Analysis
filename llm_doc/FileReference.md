@@ -126,9 +126,6 @@ Condensed quick-reference: pipeline order, minimal setup, per-script options, mo
 ### llm_doc/UnitTests.md — Unit Test Reference
 Coverage map and per-script test details for the toolkit's unit tests, plus how worker scripts are tested via AST extraction and what is not exercised.
 
-### llm_doc/Analysis Map.md — Subsystem Map
-Subsystems organized by layer (Foundation, Engine/Gameplay, Rendering, Physics/Audio, Networking, UI) with the `-TargetDir` path to pass to `archgen.ps1`, plus a recommended study order.
-
 ### llm_doc/Summary - 1.md — Initial Troubleshooting Summary
 First session summary covering the clangd crash, emergency `.clangd` config, and initial Serena setup.
 

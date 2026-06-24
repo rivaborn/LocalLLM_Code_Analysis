@@ -1088,6 +1088,8 @@ architecture/
 └── diagram_data.md                              ← Extracted signal for overview
 ```
 
+> **Project-specific files vs. the toolkit.** The toolkit (`llm_scripts/`, `llm_prompts/`, `llm_doc/`) is generic and reusable across codebases. Anything specific to *the codebase being analyzed* lives at that codebase's root, not in the toolkit: `ANALYSIS_STATUS.md` (which subsystems are done, with doc counts and gaps) and `Analysis Map.md` (the subsystem plan / `-TargetDir` paths and study order). The `architecture/` output and these status files belong to the target codebase, not the toolkit repo.
+
 ---
 
 ## 19. Resumability & Incremental Runs
