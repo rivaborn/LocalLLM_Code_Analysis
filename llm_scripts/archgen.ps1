@@ -226,6 +226,22 @@ if ($llmBackend -eq 'claude') {
     if (-not (Test-Path $claudeCfgDir)) { Write-Err "Claude config dir not found: $claudeCfgDir"; exit 2 }
 }
 
+# Degrade fallback (local backends only): when the local model hits the degrade path on a
+# file (thinking-exhaustion / empty / context overflow), escalate THAT file to this claude
+# model with the full payload instead of emitting a truncated doc, then continue locally.
+# Empty = disabled. Requires a valid claude config dir.
+$degradeFallbackModel = Cfg 'DEGRADE_FALLBACK_MODEL' ''
+if ($llmBackend -eq 'claude') {
+    $degradeFallbackModel = ''
+} elseif ($degradeFallbackModel -ne '') {
+    if (-not $claudeCfgDir -or -not (Test-Path $claudeCfgDir)) {
+        Write-Host "DEGRADE_FALLBACK_MODEL='$degradeFallbackModel' set but $cfgDirKey missing/invalid -- disabling claude fallback" -ForegroundColor Yellow
+        $degradeFallbackModel = ''
+    } else {
+        Write-Host "Degrade fallback:  local failures escalate to claude '$degradeFallbackModel'" -ForegroundColor Cyan
+    }
+}
+
 # ── Paths ─────────────────────────────────────────────────────
 
 $repoRoot = (Get-Location).Path
@@ -1674,7 +1690,7 @@ foreach ($item in $dispatchQueue) {
         $serenaArg, $bundleHdrDoc, $outputBudget, $preambleContent, $elideSource,
         $maxTokensArg, $dirContextDir, $sharedHeaderDir, $useJsonOutput,
         $llmBackend, $llmEndpoint, $llmModel, $llmTemp, $llmMaxTokens, $llmTimeout, $llmNumCtx,
-        $llmThink, $PSScriptRoot
+        $llmThink, $PSScriptRoot, $degradeFallbackModel
 
     $running.Add([pscustomobject]@{ Job = $j; Rel = $firstRel })
     Show-Progress $toDo $startTime $rateLimitFile

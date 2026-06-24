@@ -38,7 +38,8 @@ param(
     [int]   $llmTimeout = 900,
     [int]   $llmNumCtx = 0,
     [bool]  $llmThink = $false,
-    [string]$toolkitDir = ""
+    [string]$toolkitDir = "",
+    [string]$fallbackModel = ""    # non-empty (e.g. 'sonnet') = escalate this file to claude on local degrade
 )
 
 # Local-LLM backend helpers. Start-Job runs this in a fresh runspace where
@@ -377,6 +378,7 @@ $attempt  = 0
 $stage    = 0          # 0=full+headers, 1=full no headers, 2=truncated no headers
 $success  = $false
 $maxStage = 2
+$claudeFallbackTried = $false   # one-shot claude escalation on local degrade (see fallbackModel)
 
 while ($true) {
     if (Test-Path $fatalFlag) { exit 0 }
@@ -492,6 +494,34 @@ while ($true) {
     # stages and fail as before.)
     $localTooLong = ($llmBackend -ne 'claude') -and ($exitCode -ne 0) -and ($respText -match '400|context length|maximum context|context window|exceed|too long|too large|exhausted budget|[Ee]mpty response|suspiciously short')
     if ((Test-TooLong $respText) -or $localTooLong) {
+        # On a local degrade, escalate this file to a Claude model (e.g. sonnet) ONCE, with the
+        # full untruncated payload, instead of emitting a truncated local doc. The run then
+        # continues on the local server for later files. No-op if fallbackModel/claudeCfgDir unset.
+        if ($fallbackModel -ne '' -and $claudeCfgDir -ne '' -and -not $claudeFallbackTried) {
+            $claudeFallbackTried = $true
+            Write-Host "  [degrade->claude] $rel -- local degrade; escalating to $fallbackModel" -ForegroundColor Magenta
+            $prevCfg = $env:CLAUDE_CONFIG_DIR
+            try {
+                $env:CLAUDE_CONFIG_DIR = $claudeCfgDir
+                $fbArgs = @('-p', '--model', $fallbackModel, '--max-turns', $maxTurns,
+                            '--output-format', $fmtArg, '--append-system-prompt-file', $sysPromptFile)
+                if ([int]$maxOutputTokens -gt 0) { $fbArgs += @('--max-tokens', $maxOutputTokens) }
+                $fbResp = $payload | & claude @fbArgs 2>&1
+                $fbExit = $LASTEXITCODE
+                $fbText = if ($fbResp -is [array]) { $fbResp -join "`n" } else { [string]$fbResp }
+                if ($fbExit -eq 0 -and -not (Test-RateLimit $fbText) -and -not (Test-TooLong $fbText) -and $fbText.Trim().Length -ge 200) {
+                    $respText = $fbText
+                    $success  = $true
+                    $env:CLAUDE_CONFIG_DIR = $prevCfg
+                    Write-Host "  [degrade->claude] $rel -- recovered via $fallbackModel" -ForegroundColor Green
+                    break
+                }
+                Write-Host "  [degrade->claude] $rel -- $fallbackModel unusable (exit=$fbExit); continuing local degrade" -ForegroundColor Yellow
+            } catch {
+                Write-Host "  [degrade->claude] $rel -- $fallbackModel error: $($_.Exception.Message); continuing local degrade" -ForegroundColor Yellow
+            }
+            $env:CLAUDE_CONFIG_DIR = $prevCfg
+        }
         $stage++
         if ($stage -le $maxStage) {
             $stageLabel = switch ($stage) {
