@@ -6,6 +6,11 @@
 # (the stage is completed first, then its failed files + reasons
 # are listed in the report, and the pipeline exits).
 #
+# On the ollama backend the pipeline talks to raw Ollama (:11434), which
+# bypasses the LLMConfig gateway's GPU arbitration. A pre-flight step POSTs
+# the model to the gateway's /api/load (:11430) so Ollama owns the GPU's VRAM
+# before the run; best-effort (warns, does not abort). Skip with -SkipLoad.
+#
 # Stages (0b archgen_dirs is claude-only and auto-skipped on local):
 #   0   serena_extract.ps1      LSP extraction (free)
 #   0b  archgen_dirs.ps1        dir overviews (claude only)
@@ -34,6 +39,7 @@ param(
     [switch]$Claude1,
     [switch]$SkipSerena,
     [switch]$SkipPass2,
+    [switch]$SkipLoad,
     [string]$EnvFile    = ".env",
     [string]$ReportPath = ""
 )
@@ -203,6 +209,30 @@ $script:backend = Get-EnvVal 'LLM_BACKEND'; if (-not $script:backend) { $script:
 $script:model   = if ($script:backend -eq 'claude') { Get-EnvVal 'CLAUDE_MODEL' } else { Get-EnvVal 'LLM_DEFAULT_MODEL' }
 if (-not $script:model) { $script:model = '(default)' }
 
+# Pre-flight: arbitrate the GPU for Ollama. The ollama backend hits raw Ollama
+# (:11434) directly, bypassing the gateway's GPU arbitration, so we POST the model
+# to the gateway's /api/load (:11430) once before the run -- this evicts any other
+# resident model (e.g. vLLM) and hands the card to Ollama. Best-effort: a failure
+# warns but does not abort (Ollama still lazy-loads on first request, just without
+# arbitration). vllm self-loads through the gateway already; claude needs no GPU.
+function Invoke-ModelPreload($Model) {
+    $gwHost = Get-EnvVal 'LLM_HOST';         if (-not $gwHost) { $gwHost = '192.168.1.40' }
+    $gwPort = Get-EnvVal 'LLM_GATEWAY_PORT'; if (-not $gwPort) { $gwPort = '11430' }
+    $uri  = "http://${gwHost}:${gwPort}/api/load"
+    $body = @{ server = 'ollama'; model = $Model } | ConvertTo-Json -Compress
+    Write-Host ""
+    Write-Host "===== PRE-FLIGHT: load '$Model' on GPU via gateway ($uri) =====" -ForegroundColor Cyan
+    try {
+        Invoke-RestMethod -Uri $uri -Method Post -Body $body -ContentType 'application/json' -TimeoutSec 600 | Out-Null
+        Write-Host "Gateway load OK: '$Model' resident on Ollama (GPU arbitrated)." -ForegroundColor Green
+    } catch {
+        Write-Host "WARNING: gateway pre-load failed -- $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "         Continuing; Ollama will lazy-load on first request WITHOUT gateway" -ForegroundColor Yellow
+        Write-Host "         arbitration, so the model may land partially on CPU. To load manually:" -ForegroundColor Yellow
+        Write-Host "         POST $uri  {`"server`":`"ollama`",`"model`":`"$Model`"}" -ForegroundColor Yellow
+    }
+}
+
 $archState = Join-Path $archDir '.archgen_state'
 $pass2St   = Join-Path $archDir '.pass2_state'
 
@@ -212,6 +242,8 @@ Write-Host "============================================" -ForegroundColor Yello
 Write-Host "Backend / model: $script:backend / $script:model"
 Write-Host "Target:          $TargetDir"
 Write-Host "Report:          $ReportPath"
+
+if ($script:backend -eq 'ollama' -and -not $SkipLoad) { Invoke-ModelPreload $script:model }
 
 # --- run stages in order (hashtable splat = named binding) ---------
 
