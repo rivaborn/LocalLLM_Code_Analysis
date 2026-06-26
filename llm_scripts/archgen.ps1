@@ -1460,11 +1460,18 @@ $script:progressBaseHash = 0
 function Show-Progress {
     param($toDo, $startTime, $rateLimitFile)
     try {
-        # Count lines in hashes.tsv - append-only, no locks needed
+        # Count lines in hashes.tsv. Workers append to it concurrently, so it MUST be
+        # opened with FileShare.ReadWrite -- a default StreamReader open (FileShare.Read)
+        # throws "being used by another process" whenever a worker holds a write handle.
         $lineCount = 0
-        $reader = [System.IO.StreamReader]::new($hashDbPath, [System.Text.Encoding]::UTF8, $true, 4096)
-        while ($null -ne $reader.ReadLine()) { $lineCount++ }
-        $reader.Close()
+        if (Test-Path $hashDbPath) {
+            $fs = [System.IO.FileStream]::new($hashDbPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+            try {
+                $reader = [System.IO.StreamReader]::new($fs, [System.Text.Encoding]::UTF8, $true, 4096)
+                while ($null -ne $reader.ReadLine()) { $lineCount++ }
+                $reader.Dispose()
+            } finally { $fs.Dispose() }
+        }
 
         $done = $lineCount - $script:progressBaseHash
         if ($done -lt 0) { $done = 0 }
@@ -1505,8 +1512,9 @@ function Show-Progress {
         $line = "PROGRESS: $done/$toDo  skip=$($script:progressSkip)  fail=$fail  retries=$retries  rate=${rate}/s  eta=$eta  $modelStatus$rlStatus"
         [Console]::Write("`r" + $line.PadRight(100))
     } catch {
-        # Debug: if progress fails, show why
-        [Console]::Write("`r" + "PROGRESS ERROR: $($_.Exception.Message)".PadRight(100))
+        # Progress is a best-effort, repeating display tick -- a transient file-lock or
+        # parse hiccup just skips this repaint (the next tick recovers). Never smear an
+        # error across the live progress line.
     }
 }
 
