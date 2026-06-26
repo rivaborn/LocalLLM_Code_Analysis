@@ -283,7 +283,7 @@ if ($Test) {
     Assert-Equal 'SanitizeId: all special chars'    '___'             (SanitizeId '!@#')
     Assert-Equal 'SanitizeId: empty string'         ''                (SanitizeId '')
 
-    # ── Test: Parse-GraphDoc — basic extraction ───────────────
+    # ── Test: Parse-GraphDoc - basic extraction ───────────────
 
     Write-Host 'Testing Parse-GraphDoc: basic extraction ...' -ForegroundColor Cyan
 
@@ -315,7 +315,7 @@ if ($Test) {
     Assert-Equal 'Parse basic: edge 1 sub'        'Engine'     $r1.Edges[0].sub
     Assert-Equal 'Parse basic: edge 3 callee'     'RandInit'   $r1.Edges[2].callee
 
-    # ── Test: Parse-GraphDoc — subsystem detection ────────────
+    # ── Test: Parse-GraphDoc - subsystem detection ────────────
 
     Write-Host 'Testing Parse-GraphDoc: subsystem detection ...' -ForegroundColor Cyan
 
@@ -331,7 +331,7 @@ if ($Test) {
     $rSub3 = Parse-GraphDoc $docSub3
     Assert-Equal 'Subsystem: first component'     'Engine' $rSub3.Subsystem
 
-    # ── Test: Parse-GraphDoc — section transitions ────────────
+    # ── Test: Parse-GraphDoc - section transitions ────────────
 
     Write-Host 'Testing Parse-GraphDoc: section transitions ...' -ForegroundColor Cyan
 
@@ -363,7 +363,7 @@ if ($Test) {
     Assert-Equal 'Transitions: DoWork found'      'DoWork' $rTrans.FuncFile[1].func
     Assert-Equal 'Transitions: edge count'        1  $rTrans.Edges.Count
 
-    # ── Test: Parse-GraphDoc — empty/null ─────────────────────
+    # ── Test: Parse-GraphDoc - empty/null ─────────────────────
 
     Write-Host 'Testing Parse-GraphDoc: edge cases ...' -ForegroundColor Cyan
 
@@ -375,7 +375,7 @@ if ($Test) {
     $rNull = Parse-GraphDoc $null
     Assert-Equal 'Parse null: no funcs'           0  $rNull.FuncFile.Count
 
-    # ── Test: Parse-GraphDoc — backtick/bold func names ───────
+    # ── Test: Parse-GraphDoc - backtick/bold func names ───────
 
     Write-Host 'Testing Parse-GraphDoc: func name formatting ...' -ForegroundColor Cyan
 
@@ -508,7 +508,7 @@ if ($Test) {
     $cssEdges.Add(@{ caller = 'Tick'; callee = 'Render'; sub = 'Core' })
     # Core -> Audio (x1)
     $cssEdges.Add(@{ caller = 'Init'; callee = 'Audio';  sub = 'Core' })
-    # Intra-subsystem (Core -> Core) — should NOT appear
+    # Intra-subsystem (Core -> Core) - should NOT appear
     $cssEdges.Add(@{ caller = 'Init'; callee = 'Tick';   sub = 'Core' })
 
     $cross = Get-CrossSubsystemEdges $cssEdges $cssFuncs

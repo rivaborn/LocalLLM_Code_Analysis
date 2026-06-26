@@ -63,7 +63,7 @@ function Get-FenceLang($file, $def) {
 }
 
 function Test-RateLimit($text) {
-    # A valid pass-2 doc starts with a markdown heading — never an error message.
+    # A valid pass-2 doc starts with a markdown heading - never an error message.
     if ($text -match '(?m)^#\s+\S') { return $false }
     if ($text -match '(?m)^\s*429\b')           { return $true }
     if ($text -match '"status"\s*:\s*429')       { return $true }
@@ -161,7 +161,7 @@ function Update-Counter($path, $key) {
 if (Test-Path $fatalFlag) { exit 0 }
 
 # ---------------------------------------------------------------------------
-# Build payload — called with decreasing context on "too long" retries
+# Build payload - called with decreasing context on "too long" retries
 #   stage 0: source (truncated at 500) + pass1 doc + arch context + xref context  (normal)
 #   stage 1: source (truncated at 500) + pass1 doc + arch context  (drop xref)
 #   stage 2: source (truncated at 200) + pass1 doc only            (drop arch context)
@@ -301,7 +301,7 @@ while ($true) {
         break
     }
 
-    # Prompt too long, or a local-backend degrade (thinking-exhaustion / empty / context) —
+    # Prompt too long, or a local-backend degrade (thinking-exhaustion / empty / context) -
     # drop context and retry. Local backends signal these via a 400/context error or empty/
     # short/thinking-exhausted output rather than a clean "too long" message.
     $localTooLong = ($llmBackend -ne 'claude') -and ($exitCode -ne 0) -and ($respText -match '400|context length|maximum context|context window|exceed|too long|too large|exhausted budget|[Ee]mpty response|suspiciously short')

@@ -196,7 +196,7 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 $fence = Get-FenceLang $rel $defaultFence
 
 # ---------------------------------------------------------------------------
-# Build prompt payload — called with decreasing context on "too long" retries
+# Build prompt payload - called with decreasing context on "too long" retries
 #   $stage 0 = full content + headers (normal)
 #   $stage 1 = full content, no headers
 #   $stage 2 = aggressively truncated content (25% of maxFileLines), no headers
@@ -308,7 +308,7 @@ function Build-Payload($stage, $rel, $src, $repoRoot, $fence, $srcLines, $maxFil
         $lspSection = "`n`nLSP ANALYSIS CONTEXT:`n$serenaContext`n"
     }
 
-    # Opt v2#5: Source elision — skip FILE CONTENT when LSP context has symbols + trimmed source
+    # Opt v2#5: Source elision - skip FILE CONTENT when LSP context has symbols + trimmed source
     if ($elideSource -eq "1" -and $stage -le 1 -and $serenaContext -match '## Symbol Overview' -and $serenaContext -match '## Trimmed Source') {
         $content = "/* Full source elided - see LSP context for symbols and key sections ($lineCount lines total) */"
     }
@@ -330,7 +330,7 @@ function Build-Payload($stage, $rel, $src, $repoRoot, $fence, $srcLines, $maxFil
         }
     }
 
-    # Load the prompt schema into the user message (for prompt caching — keeps system prompt fixed)
+    # Load the prompt schema into the user message (for prompt caching - keeps system prompt fixed)
     $schemaSection = ""
     if (Test-Path $promptFile) {
         $schemaSection = (Get-Content $promptFile -Raw -ErrorAction SilentlyContinue)
@@ -345,7 +345,7 @@ function Build-Payload($stage, $rel, $src, $repoRoot, $fence, $srcLines, $maxFil
 }
 
 # ---------------------------------------------------------------------------
-# Load source lines once — Build-Payload uses them at each stage
+# Load source lines once - Build-Payload uses them at each stage
 # ---------------------------------------------------------------------------
 
 $srcLines = Get-Content $src -ErrorAction SilentlyContinue
@@ -401,7 +401,7 @@ while ($true) {
         if ($preambleContent -ne "") {
             $preambleSection = "ENGINE CONVENTIONS:`n$preambleContent`n`n"
         }
-        # Load schema for batch payload (prompt caching — schema in user message)
+        # Load schema for batch payload (prompt caching - schema in user message)
         $batchSchema = ""
         if (Test-Path $promptFile) {
             $batchSchema = Get-Content $promptFile -Raw -ErrorAction SilentlyContinue
@@ -485,7 +485,7 @@ while ($true) {
         break
     }
 
-    # Prompt too long — degrade context and retry immediately (no attempt increment).
+    # Prompt too long - degrade context and retry immediately (no attempt increment).
     # Local backends (ollama/vllm) signal an oversized/overwhelming prompt several ways:
     # a 400/"context length" error (overflow), OR empty/short/thinking-exhausted output
     # when a huge prompt (e.g. file + many bundled headers) drives the model to emit
@@ -531,7 +531,7 @@ while ($true) {
             Write-Host "  [too-long] $rel -- $stageLabel (stage $stage)" -ForegroundColor DarkCyan
             continue
         }
-        # All stages exhausted — log and fail
+        # All stages exhausted - log and fail
         $errEntry = "====`nTimestamp: $(Get-Date -Format u)`nFile: $rel`nType: TOO_LONG (all $maxStage stages exhausted)`n----`n$respText`n"
         [System.IO.File]::AppendAllText($errorLog, $errEntry)
         Update-Counter $counterPath "fail"
@@ -567,7 +567,7 @@ while ($true) {
         continue
     }
 
-    # Transient failure — retry up to maxRetries, then fatal
+    # Transient failure - retry up to maxRetries, then fatal
     $attempt++
     if ($attempt -le $maxRetries) {
         Update-Counter $counterPath "retries"
@@ -610,7 +610,7 @@ if ($success -and -not $isBatch) {
 }
 
 # ---------------------------------------------------------------------------
-# Opt v2#1: Batch mode — split response into individual docs
+# Opt v2#1: Batch mode - split response into individual docs
 # ---------------------------------------------------------------------------
 
 if ($success -and $isBatch) {

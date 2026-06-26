@@ -1,12 +1,12 @@
 # ============================================================
-# archgen_dirs.ps1 — Directory-Level Architecture Context
+# archgen_dirs.ps1 - Directory-Level Architecture Context
 #
 # Generates a short architectural overview for each source directory,
 # used by archgen_worker.ps1 to inject directory-level context into
 # Pass 1 analysis. This gives every file architectural context in
 # its first (and often only) analysis pass.
 #
-# Zero cost per file — one Claude call per directory.
+# Zero cost per file - one Claude call per directory.
 # Output: architecture/.dir_context/<dir_path>.dir.md
 #
 # Usage:

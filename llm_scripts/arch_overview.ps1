@@ -354,7 +354,7 @@ if ($Test) {
     Assert-True  'RateLimit: hit message limit'       (Test-RateLimit "You've hit your message limit")
     Assert-True  'RateLimit: hit daily limit'         (Test-RateLimit "You've hit your daily limit")
 
-    # Negative cases — markdown response starts with # heading
+    # Negative cases - markdown response starts with # heading
     Assert-False 'RateLimit: markdown heading'        (Test-RateLimit "# Architecture Overview`n`n## Repository Shape")
     Assert-False 'RateLimit: normal response'         (Test-RateLimit 'This is a normal analysis result.')
     Assert-False 'RateLimit: empty string'            (Test-RateLimit '')
@@ -645,12 +645,12 @@ if ($Test) {
     $bigContent | Set-Content (Join-Path $subChild1 'big.cpp.md') -Encoding UTF8
     @('# large/child2/x.cpp', '## File Purpose', 'X file.') | Set-Content (Join-Path $subChild2 'x.cpp.md') -Encoding UTF8
 
-    # Test with high threshold — everything fits in one chunk
+    # Test with high threshold - everything fits in one chunk
     $resultHigh = @(Get-Subsystems $subRoot 'SmallSub' 1000)
     Assert-Equal 'Subsystems high threshold: 1 chunk' 1 $resultHigh.Count
     Assert-Equal 'Subsystems high threshold: is SmallSub' 'SmallSub' $resultHigh[0]
 
-    # Test with low threshold — LargeSub should split into children
+    # Test with low threshold - LargeSub should split into children
     $resultLow = @(Get-Subsystems $subRoot 'LargeSub' 5)
     Assert-True  'Subsystems low threshold: split into children' ($resultLow.Count -ge 2)
 
@@ -838,7 +838,7 @@ function Invoke-Claude($prompt, $label) {
                 $currentPrompt = $header + $Matches[0].Substring(0, $Matches[0].IndexOf("`n") + 1) + $trunced + "`n" + ($endPat -replace '\(.*\)', ($Matches[4])) + $footer
                 Write-Host "  [too-long] $label -- retrying with ~$([int]($keepFraction*100))% content (stage $truncStage)" -ForegroundColor DarkCyan
             } else {
-                # Can't find markers to truncate — just fail
+                # Can't find markers to truncate - just fail
                 break
             }
             continue
@@ -958,7 +958,7 @@ foreach ($sub in $subsystems) {
 
     New-Item -ItemType Directory -Force -Path (Split-Path $subArch -Parent) | Out-Null
 
-    # Opt v3#6: Incremental — skip if subsystem docs haven't changed
+    # Opt v3#6: Incremental - skip if subsystem docs haven't changed
     if (-not $Full -and (Test-Path $subArch)) {
         $subDocs = @(Get-PerFileDocs $subDocRoot)
         $currentHash = ''
@@ -980,12 +980,12 @@ foreach ($sub in $subsystems) {
             $tier1Skip++
             continue
         }
-        # Hash changed or new — record after generation
+        # Hash changed or new - record after generation
     }
 
     # Resume: skip if already done and not doing incremental check
     if ($Full -and (Test-Path $subArch)) {
-        # Full mode regenerates everything — don't skip
+        # Full mode regenerates everything - don't skip
     } elseif (-not $Full -and (Test-Path $subArch)) {
         # Already handled by incremental check above
     }

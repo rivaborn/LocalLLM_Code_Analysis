@@ -30,7 +30,7 @@ param(
     [string]$EnvFile   = ".env",
     [int]   $Top       = 0,      # Only process top-N scoring files (0 = all)
     [switch]$ScoreOnly,           # Just print scores, don't run Pass 2
-    [switch]$Delta,               # Opt v2#4: Delta-only mode — output only new insights, not full doc
+    [switch]$Delta,               # Opt v2#4: Delta-only mode - output only new insights, not full doc
     [switch]$Test
 )
 
@@ -226,12 +226,12 @@ if ($Test) {
     # Tiered disabled
     Assert-Equal 'Complexity: tiered off'            'haiku'  (Get-Pass2FileComplexity 5000 50 '0' 'haiku' 'sonnet')
 
-    # Tiered enabled — high complexity
+    # Tiered enabled - high complexity
     Assert-Equal 'Complexity: >1000 lines'           'sonnet' (Get-Pass2FileComplexity 1001 0 '1' 'haiku' 'sonnet')
     Assert-Equal 'Complexity: >10 refs'              'sonnet' (Get-Pass2FileComplexity 100 11 '1' 'haiku' 'sonnet')
     Assert-Equal 'Complexity: both high'             'sonnet' (Get-Pass2FileComplexity 2000 20 '1' 'haiku' 'sonnet')
 
-    # Tiered enabled — low/medium complexity
+    # Tiered enabled - low/medium complexity
     Assert-Equal 'Complexity: small file few refs'   'haiku'  (Get-Pass2FileComplexity 500 5 '1' 'haiku' 'sonnet')
     Assert-Equal 'Complexity: at boundary 1000/10'   'haiku'  (Get-Pass2FileComplexity 1000 10 '1' 'haiku' 'sonnet')
 

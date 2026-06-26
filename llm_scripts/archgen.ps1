@@ -1,5 +1,5 @@
 # ============================================================
-# archgen.ps1 — File-Level Architecture Doc Generator
+# archgen.ps1 - File-Level Architecture Doc Generator
 #
 # Generates one .md doc per source file for any game engine codebase.
 #
@@ -450,7 +450,7 @@ if ($Test) {
     }
 
     Write-Host '============================================' -ForegroundColor Yellow
-    Write-Host '  archgen.ps1 — Unit Tests' -ForegroundColor Yellow
+    Write-Host '  archgen.ps1 - Unit Tests' -ForegroundColor Yellow
     Write-Host '============================================' -ForegroundColor Yellow
     Write-Host ''
 
@@ -1229,7 +1229,7 @@ foreach ($rel in $files) {
         continue
     }
 
-    # Opt #1: Skip generated/trivial files — write stub doc instead
+    # Opt #1: Skip generated/trivial files - write stub doc instead
     if ($skipTrivial -eq '1' -and (Test-TrivialFile $rel $src $minTrivialLines)) {
         $outDir = Split-Path $out -Parent
         New-Item -ItemType Directory -Force -Path $outDir | Out-Null
@@ -1244,7 +1244,7 @@ foreach ($rel in $files) {
     $queue.Add($rel)
 }
 
-# Opt #6: Batch templated files — analyze one representative per group
+# Opt #6: Batch templated files - analyze one representative per group
 $batchedDocs = @{}
 if ($batchTemplated -eq '1' -and $queue.Count -gt 0) {
     $groups = @{}
@@ -1347,7 +1347,7 @@ $toDo = $queue.Count
 # ── Banner ────────────────────────────────────────────────────
 
 Write-Host '============================================' -ForegroundColor Yellow
-Write-Host '  archgen.ps1 — Architecture Doc Generator' -ForegroundColor Yellow
+Write-Host '  archgen.ps1 - Architecture Doc Generator' -ForegroundColor Yellow
 Write-Host '============================================' -ForegroundColor Yellow
 Write-Host "Repo root:       $repoRoot"
 Write-Host "Codebase:        $codebaseDesc"
@@ -1417,7 +1417,7 @@ $script:progressBaseHash = 0
 function Show-Progress {
     param($toDo, $startTime, $rateLimitFile)
     try {
-        # Count lines in hashes.tsv — append-only, no locks needed
+        # Count lines in hashes.tsv - append-only, no locks needed
         $lineCount = 0
         $reader = [System.IO.StreamReader]::new($hashDbPath, [System.Text.Encoding]::UTF8, $true, 4096)
         while ($null -ne $reader.ReadLine()) { $lineCount++ }
@@ -1634,7 +1634,7 @@ foreach ($item in $dispatchQueue) {
     $isBatch = $item.IsBatch
     $firstRel = $rels[0]
 
-    # Opt #5: Tiered model — classify by first file (batch files are all small/simple)
+    # Opt #5: Tiered model - classify by first file (batch files are all small/simple)
     $fileModel = $defaultModel
     if ($tieredModel -eq '1' -and $hasSerenaContext -and -not $isBatch) {
         $complexity = Get-FileComplexity $firstRel $repoRoot $serenaContextDir
