@@ -360,7 +360,7 @@ Write-Host '  archgen_dirs.ps1 - Directory Context'      -ForegroundColor Yellow
 Write-Host '============================================' -ForegroundColor Yellow
 Write-Host "Repo root:   $repoRoot"
 Write-Host "Directories: $($dirs.Count)"
-Write-Host "Model:       $model"
+if ($llmBackend -eq 'claude') { Write-Host "Model:       $model" } else { Write-Host "Model:       $llmModel" }
 Write-Host ''
 
 # Skip directories that already have context
