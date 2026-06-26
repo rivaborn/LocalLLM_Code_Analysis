@@ -46,7 +46,7 @@ function Read-EnvFile($path) {
     return $vars
 }
 
-# ── Testable functions ────────────────────────────────────────
+# -- Testable functions ----------------------------------------
 
 function Test-DocFileIncluded($name, $fullName) {
     if ($fullName -match '[/\\]\.archgen_state[/\\]') { return $false }
@@ -236,7 +236,7 @@ function Build-XrefOutput($funcMap, $callEdges, $globals, $includeDeps) {
     return $sb.ToString()
 }
 
-# ── Unit Tests ────────────────────────────────────────────────
+# -- Unit Tests ------------------------------------------------
 
 if ($Test) {
     $script:testsPassed = 0
@@ -278,7 +278,7 @@ if ($Test) {
 
     try {
 
-    # ── Test: Test-DocFileIncluded ────────────────────────────
+    # -- Test: Test-DocFileIncluded ----------------------------
 
     Write-Host 'Testing Test-DocFileIncluded ...' -ForegroundColor Cyan
 
@@ -304,7 +304,7 @@ if ($Test) {
     # Edge: subsystem architecture files
     Assert-False 'DocIncluded: architecture overview'     (Test-DocFileIncluded 'architecture Core.md' 'C:\arch\architecture Core.md')
 
-    # ── Test: Parse-DocFile - function extraction ────────────
+    # -- Test: Parse-DocFile - function extraction ------------
 
     Write-Host 'Testing Parse-DocFile: function extraction ...' -ForegroundColor Cyan
 
@@ -345,7 +345,7 @@ if ($Test) {
     Assert-Equal 'Parse funcs: edge 3 caller'     'RandHelper' $r1.CallEdges[2].caller
     Assert-Equal 'Parse funcs: edge 3 callee'     'RandInit'   $r1.CallEdges[2].callee
 
-    # ── Test: Parse-DocFile - global state extraction ────────
+    # -- Test: Parse-DocFile - global state extraction --------
 
     Write-Host 'Testing Parse-DocFile: globals extraction ...' -ForegroundColor Cyan
 
@@ -385,7 +385,7 @@ if ($Test) {
     Assert-Equal 'Parse globals filter: skips header row'  1 $r2f.Globals.Count
     Assert-Equal 'Parse globals filter: keeps real var'     'ActualVar' $r2f.Globals[0].name
 
-    # ── Test: Parse-DocFile - include deps extraction ────────
+    # -- Test: Parse-DocFile - include deps extraction --------
 
     Write-Host 'Testing Parse-DocFile: include deps extraction ...' -ForegroundColor Cyan
 
@@ -409,7 +409,7 @@ if ($Test) {
     Assert-Equal 'Parse deps: header 4'           'World.h'     $r3.IncludeDeps[3].header
     Assert-Equal 'Parse deps: owner file'         'Engine/Source/Runtime/Engine/Private/Actor.cpp' $r3.IncludeDeps[0].file
 
-    # ── Test: Parse-DocFile - section transitions ────────────
+    # -- Test: Parse-DocFile - section transitions ------------
 
     Write-Host 'Testing Parse-DocFile: section transitions ...' -ForegroundColor Cyan
 
@@ -459,7 +459,7 @@ if ($Test) {
     Assert-Equal 'Sections: deps found'           1             $r4.IncludeDeps.Count
     Assert-Equal 'Sections: dep header'           'Header.h'    $r4.IncludeDeps[0].header
 
-    # ── Test: Parse-DocFile - empty/minimal docs ─────────────
+    # -- Test: Parse-DocFile - empty/minimal docs -------------
 
     Write-Host 'Testing Parse-DocFile: edge cases ...' -ForegroundColor Cyan
 
@@ -489,7 +489,7 @@ if ($Test) {
     Assert-Equal 'Parse stub: no globals'       0  $rStub.Globals.Count
     Assert-Equal 'Parse stub: no deps'          0  $rStub.IncludeDeps.Count
 
-    # ── Test: Parse-DocFile - call edge patterns ─────────────
+    # -- Test: Parse-DocFile - call edge patterns -------------
 
     Write-Host 'Testing Parse-DocFile: call edge patterns ...' -ForegroundColor Cyan
 
@@ -531,7 +531,7 @@ if ($Test) {
     $rNoCall = Parse-DocFile $docNoCalls
     Assert-Equal 'No-call line: zero edges'      0  $rNoCall.CallEdges.Count
 
-    # ── Test: Parse-DocFile - backtick-wrapped func names ────
+    # -- Test: Parse-DocFile - backtick-wrapped func names ----
 
     Write-Host 'Testing Parse-DocFile: formatting in func names ...' -ForegroundColor Cyan
 
@@ -551,7 +551,7 @@ if ($Test) {
     Assert-Equal 'Fmt funcs: bold stripped'       'BoldFunc'      $rFmt.FuncMap[1].func
     Assert-Equal 'Fmt funcs: normal preserved'   'NormalFunc'    $rFmt.FuncMap[2].func
 
-    # ── Test: Parse-DocFile - File-Static section ────────────
+    # -- Test: Parse-DocFile - File-Static section ------------
 
     Write-Host 'Testing Parse-DocFile: File-Static section ...' -ForegroundColor Cyan
 
@@ -566,7 +566,7 @@ if ($Test) {
     Assert-Equal 'File-Static: parsed as globals' 1           $rStatic.Globals.Count
     Assert-Equal 'File-Static: name'              's_Counter' $rStatic.Globals[0].name
 
-    # ── Test: Build-XrefOutput ────────────────────────────────
+    # -- Test: Build-XrefOutput --------------------------------
 
     Write-Host 'Testing Build-XrefOutput ...' -ForegroundColor Cyan
 
@@ -625,7 +625,7 @@ if ($Test) {
     # Subsystem interfaces - Engine subsystem has all 4 functions
     Assert-True  'XrefOutput: Engine subsystem'             ($output -match '### Engine')
 
-    # ── Test: Build-XrefOutput - empty inputs ────────────────
+    # -- Test: Build-XrefOutput - empty inputs ----------------
 
     Write-Host 'Testing Build-XrefOutput: empty inputs ...' -ForegroundColor Cyan
 
@@ -640,7 +640,7 @@ if ($Test) {
     Assert-False 'XrefOutput empty: no global section'      ($emptyOutput -match '## Global State Ownership')
     Assert-False 'XrefOutput empty: no header deps'         ($emptyOutput -match '## Header Dependencies')
 
-    # ── Test: Parse-DocFile + Build-XrefOutput integration ───
+    # -- Test: Parse-DocFile + Build-XrefOutput integration ---
 
     Write-Host 'Testing end-to-end integration ...' -ForegroundColor Cyan
 
@@ -701,7 +701,7 @@ if ($Test) {
     Assert-True  'E2E: Actor.h dep counted'                 ($e2eOutput -match 'Actor\.h.*2')
     Assert-True  'E2E: cross-file call visible'             ($e2eOutput -match 'SpawnActor')
 
-    # ── Test: Parse-DocFile - "Key Methods" variant ──────────
+    # -- Test: Parse-DocFile - "Key Methods" variant ----------
 
     Write-Host 'Testing Parse-DocFile: Key Methods variant ...' -ForegroundColor Cyan
 
@@ -719,7 +719,7 @@ if ($Test) {
     Assert-Equal 'Key Methods: func 2'           'MyClass::Draw'     $rMeth.FuncMap[1].func
     Assert-Equal 'Key Methods: call edge'        1                   $rMeth.CallEdges.Count
 
-    # ── Test: Parse-DocFile - Notable section resets ─────────
+    # -- Test: Parse-DocFile - Notable section resets ---------
 
     Write-Host 'Testing Parse-DocFile: Notable section resets ...' -ForegroundColor Cyan
 
@@ -744,7 +744,7 @@ if ($Test) {
         Remove-Item -Path $testDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 
-    # ── Results ───────────────────────────────────────────────
+    # -- Results -----------------------------------------------
 
     Write-Host ''
     Write-Host '--------------------------------------------' -ForegroundColor Yellow
@@ -761,7 +761,7 @@ if ($Test) {
     exit $script:testsFailed
 }
 
-# ── Main execution ────────────────────────────────────────────
+# -- Main execution --------------------------------------------
 
 $cfg = Read-EnvFile $EnvFile
 

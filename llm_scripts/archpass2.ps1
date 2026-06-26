@@ -93,7 +93,7 @@ function Get-FenceLang($file, $def) {
     }
 }
 
-# ── Testable functions ────────────────────────────────────────
+# -- Testable functions ----------------------------------------
 
 function Get-Pass2FileScore($rel, $lineCount, $incomingCount, $hasSerena) {
     $score = ($incomingCount * 3) + ($lineCount / 100.0)
@@ -107,7 +107,7 @@ function Get-Pass2FileComplexity($lineCount, $refCount, $tieredModel, $defaultMo
     return $defaultModel
 }
 
-# ── Unit Tests ────────────────────────────────────────────────
+# -- Unit Tests ------------------------------------------------
 
 if ($Test) {
     $script:testsPassed = 0
@@ -146,7 +146,7 @@ if ($Test) {
 
     try {
 
-    # ── Test: Cfg ─────────────────────────────────────────────
+    # -- Test: Cfg ---------------------------------------------
 
     Write-Host 'Testing Cfg ...' -ForegroundColor Cyan
 
@@ -156,7 +156,7 @@ if ($Test) {
     Assert-Equal 'Cfg: empty default'  'default' (Cfg $tc 'EMPTY' 'default')
     Assert-Equal 'Cfg: no default'     ''        (Cfg $tc 'MISSING')
 
-    # ── Test: Get-SHA1 ────────────────────────────────────────
+    # -- Test: Get-SHA1 ----------------------------------------
 
     Write-Host 'Testing Get-SHA1 ...' -ForegroundColor Cyan
 
@@ -170,7 +170,7 @@ if ($Test) {
     'different' | Set-Content $sf2 -NoNewline -Encoding UTF8
     Assert-True  'SHA1: different content' ($h1 -ne (Get-SHA1 $sf2))
 
-    # ── Test: Test-RateLimit (archpass2 variant) ──────────────
+    # -- Test: Test-RateLimit (archpass2 variant) --------------
 
     Write-Host 'Testing Test-RateLimit ...' -ForegroundColor Cyan
 
@@ -184,7 +184,7 @@ if ($Test) {
     Assert-False 'RL: normal text'            (Test-RateLimit 'Normal analysis result.')
     Assert-False 'RL: empty'                  (Test-RateLimit '')
 
-    # ── Test: Get-FenceLang ───────────────────────────────────
+    # -- Test: Get-FenceLang -----------------------------------
 
     Write-Host 'Testing Get-FenceLang ...' -ForegroundColor Cyan
 
@@ -198,7 +198,7 @@ if ($Test) {
     Assert-Equal 'Fence: .toml'  'toml'       (Get-FenceLang 'foo.toml' 'x')
     Assert-Equal 'Fence: unknown' 'mydef'     (Get-FenceLang 'foo.xyz' 'mydef')
 
-    # ── Test: Get-Pass2FileScore ──────────────────────────────
+    # -- Test: Get-Pass2FileScore ------------------------------
 
     Write-Host 'Testing Get-Pass2FileScore ...' -ForegroundColor Cyan
 
@@ -219,7 +219,7 @@ if ($Test) {
     $scoreSerena   = Get-Pass2FileScore 'x.cpp' 500 5 $true
     Assert-Equal 'Score: Serena halves' ($scoreNoSerena / 2) $scoreSerena
 
-    # ── Test: Get-Pass2FileComplexity ─────────────────────────
+    # -- Test: Get-Pass2FileComplexity -------------------------
 
     Write-Host 'Testing Get-Pass2FileComplexity ...' -ForegroundColor Cyan
 
@@ -235,7 +235,7 @@ if ($Test) {
     Assert-Equal 'Complexity: small file few refs'   'haiku'  (Get-Pass2FileComplexity 500 5 '1' 'haiku' 'sonnet')
     Assert-Equal 'Complexity: at boundary 1000/10'   'haiku'  (Get-Pass2FileComplexity 1000 10 '1' 'haiku' 'sonnet')
 
-    # ── Load worker functions for testing ─────────────────────
+    # -- Load worker functions for testing ---------------------
 
     Write-Host 'Loading archpass2_worker.ps1 functions ...' -ForegroundColor Cyan
 
@@ -255,7 +255,7 @@ if ($Test) {
         Write-Host '  WARNING: archpass2_worker.ps1 not found, skipping worker tests' -ForegroundColor Yellow
     }
 
-    # ── Test: Test-TooLong (worker) ───────────────────────────
+    # -- Test: Test-TooLong (worker) ---------------------------
 
     if ($workerLoaded) {
         Write-Host 'Testing Test-TooLong (worker) ...' -ForegroundColor Cyan
@@ -268,7 +268,7 @@ if ($Test) {
         Assert-False 'TooLong: empty'                (Test-TooLong '')
     }
 
-    # ── Test: Write-ErrorLog (worker) ─────────────────────────
+    # -- Test: Write-ErrorLog (worker) -------------------------
 
     if ($workerLoaded) {
         Write-Host 'Testing Write-ErrorLog (worker) ...' -ForegroundColor Cyan
@@ -286,7 +286,7 @@ if ($Test) {
         Assert-True  'ErrorLog: has divider'         ($errContent -match '={10,}')
     }
 
-    # ── Test: Get-RateLimitResetTime (worker) ─────────────────
+    # -- Test: Get-RateLimitResetTime (worker) -----------------
 
     if ($workerLoaded) {
         Write-Host 'Testing Get-RateLimitResetTime (worker) ...' -ForegroundColor Cyan
@@ -305,7 +305,7 @@ if ($Test) {
         Assert-True  'ResetTime: no match null'    ($null -eq $t4)
     }
 
-    # ── Test: Format-LocalTime (worker) ───────────────────────
+    # -- Test: Format-LocalTime (worker) -----------------------
 
     if ($workerLoaded) {
         Write-Host 'Testing Format-LocalTime (worker) ...' -ForegroundColor Cyan
@@ -316,7 +316,7 @@ if ($Test) {
         Assert-True  'FmtTime: has PM'             ($fmt -match '(?i)pm')
     }
 
-    # ── Test: Build-Pass2Payload (worker) ─────────────────────
+    # -- Test: Build-Pass2Payload (worker) ---------------------
 
     if ($workerLoaded) {
         Write-Host 'Testing Build-Pass2Payload (worker) ...' -ForegroundColor Cyan
@@ -390,7 +390,7 @@ if ($Test) {
         Remove-Item -Path $testDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 
-    # ── Results ───────────────────────────────────────────────
+    # -- Results -----------------------------------------------
 
     Write-Host ''
     Write-Host '--------------------------------------------' -ForegroundColor Yellow
@@ -436,7 +436,7 @@ $extraExclude  = Cfg $cfg 'EXTRA_EXCLUDE_REGEX' ''
 $defaultFence  = Cfg $cfg 'DEFAULT_FENCE' 'c'
 $codebaseDesc  = Cfg $cfg 'CODEBASE_DESC' 'game engine / game codebase'
 
-# ── Local LLM backend (LLMConfig) ─────────────────────────────
+# -- Local LLM backend (LLMConfig) -----------------------------
 . (Join-Path $PSScriptRoot 'llm_core.ps1')
 $llmBackend   = Get-LLMBackend -Cfg $cfg
 $llmEndpoint  = ''

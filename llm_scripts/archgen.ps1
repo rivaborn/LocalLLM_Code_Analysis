@@ -129,7 +129,7 @@ function Get-Preset($name) {
     }
 }
 
-# ── Load config ───────────────────────────────────────────────
+# -- Load config -----------------------------------------------
 
 $cfg = Read-EnvFile $EnvFile
 
@@ -171,7 +171,7 @@ $useMaxTokens    = if ($MaxTokens -ne '') { '1' } else { Cfg 'USE_MAX_TOKENS' '0
 $useJsonOutput   = if ($JsonOutput -ne '') { '1' } else { Cfg 'JSON_OUTPUT' '0' }
 $useClassify     = if ($Classify -ne '') { '1' } else { Cfg 'CLASSIFY_FILES' '0' }
 
-# ── Local LLM backend (LLMConfig) ─────────────────────────────
+# -- Local LLM backend (LLMConfig) -----------------------------
 # vllm/ollama route doc-generation through the LLMConfig gateway; claude keeps
 # the legacy `claude` CLI path. See llm_core.ps1 + the LLM_* keys in .env.
 . (Join-Path $PSScriptRoot 'llm_core.ps1')
@@ -242,7 +242,7 @@ if ($llmBackend -eq 'claude') {
     }
 }
 
-# ── Paths ─────────────────────────────────────────────────────
+# -- Paths -----------------------------------------------------
 
 $repoRoot = (Get-Location).Path
 try {
@@ -309,7 +309,7 @@ $progressTxt   = Join-Path $stateDir 'progress.txt'
 $counterPath   = Join-Path $stateDir 'counter.json'
 $rateLimitFile = Join-Path $stateDir 'ratelimit_resume.txt'
 
-# ── Clean ─────────────────────────────────────────────────────
+# -- Clean -----------------------------------------------------
 
 if ($Clean) {
     Write-Info "CLEAN: removing docs and state (preserving .serena_context, .dir_context, .dir_headers) ..."
@@ -330,7 +330,7 @@ Remove-Item $rateLimitFile -ErrorAction SilentlyContinue
 '' | Set-Content $progressTxt -Encoding UTF8
 if (-not (Test-Path $hashDbPath)) { '' | Set-Content $hashDbPath -Encoding UTF8 }
 
-# ── Hash DB ───────────────────────────────────────────────────
+# -- Hash DB ---------------------------------------------------
 
 $oldSha = @{}
 Get-Content $hashDbPath | ForEach-Object {
@@ -338,7 +338,7 @@ Get-Content $hashDbPath | ForEach-Object {
     if ($parts.Count -eq 2 -and $parts[1] -ne '') { $oldSha[$parts[1]] = $parts[0] }
 }
 
-# ── Trivial file detection ────────────────────────────────────
+# -- Trivial file detection ------------------------------------
 
 $trivialPatterns = @(
     '\.generated\.h$',
@@ -370,7 +370,7 @@ function Write-TrivialStub($rel, $outPath) {
     $stub | Set-Content -Path $outPath -Encoding UTF8
 }
 
-# ── Tiered model classification ──────────────────────────────
+# -- Tiered model classification ------------------------------
 
 function Get-FileComplexity($rel, $repoRoot, $serenaContextDir) {
     $src = Join-Path $repoRoot ($rel -replace '/','\')
@@ -400,7 +400,7 @@ function Get-OutputBudget($lineCount, $symbolCount) {
     return '~1200 tokens'
 }
 
-# ── Structural hashing for batch templates ───────────────────
+# -- Structural hashing for batch templates -------------------
 
 function Get-StructuralHash($filePath) {
     $lines = @(Get-Content $filePath -First 20 -ErrorAction SilentlyContinue)
@@ -415,7 +415,7 @@ function Get-StructuralHash($filePath) {
     return ($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') }) -join ''
 }
 
-# ── Unit Tests ────────────────────────────────────────────────
+# -- Unit Tests ------------------------------------------------
 
 if ($Test) {
     $script:testsPassed = 0
@@ -460,7 +460,7 @@ if ($Test) {
 
     try {
 
-    # ── Test: Read-EnvFile ────────────────────────────────────
+    # -- Test: Read-EnvFile ------------------------------------
 
     Write-Host 'Testing Read-EnvFile ...' -ForegroundColor Cyan
 
@@ -495,7 +495,7 @@ if ($Test) {
     $envEmpty = Read-EnvFile (Join-Path $testDir 'nonexistent.env')
     Assert-Equal 'Read-EnvFile: missing file returns empty' 0 $envEmpty.Count
 
-    # ── Test: Get-SHA1 ────────────────────────────────────────
+    # -- Test: Get-SHA1 ----------------------------------------
 
     Write-Host 'Testing Get-SHA1 ...' -ForegroundColor Cyan
 
@@ -516,7 +516,7 @@ if ($Test) {
     $hash3 = Get-SHA1 $sha1File2
     Assert-True  'Get-SHA1: different content different hash' ($hash1 -ne $hash3)
 
-    # ── Test: Get-Preset ──────────────────────────────────────
+    # -- Test: Get-Preset --------------------------------------
 
     Write-Host 'Testing Get-Preset ...' -ForegroundColor Cyan
 
@@ -569,7 +569,7 @@ if ($Test) {
     Assert-True  'Get-Preset empty: Include matches .py'   ('.py'   -match $pe.Include)
     Assert-True  'Get-Preset empty: Include matches .rs'   ('.rs'   -match $pe.Include)
 
-    # ── Test: Get-OutputBudget ────────────────────────────────
+    # -- Test: Get-OutputBudget --------------------------------
 
     Write-Host 'Testing Get-OutputBudget ...' -ForegroundColor Cyan
 
@@ -590,7 +590,7 @@ if ($Test) {
     Assert-Equal 'Get-OutputBudget: 1499 lines'      '~1000 tokens' (Get-OutputBudget 1499 0)
     Assert-Equal 'Get-OutputBudget: 1500 lines'      '~1200 tokens' (Get-OutputBudget 1500 0)
 
-    # ── Test: Test-TrivialFile ────────────────────────────────
+    # -- Test: Test-TrivialFile --------------------------------
 
     Write-Host 'Testing Test-TrivialFile ...' -ForegroundColor Cyan
 
@@ -675,7 +675,7 @@ if ($Test) {
     ) | Set-Content $normalFile -Encoding UTF8
     Assert-False 'Test-TrivialFile: normal code is NOT trivial' (Test-TrivialFile 'src/normal.cpp' $normalFile 20)
 
-    # ── Test: Write-TrivialStub ───────────────────────────────
+    # -- Test: Write-TrivialStub -------------------------------
 
     Write-Host 'Testing Write-TrivialStub ...' -ForegroundColor Cyan
 
@@ -687,7 +687,7 @@ if ($Test) {
     Assert-True  'Write-TrivialStub: has Purpose section'   ($stubContent -match '## File Purpose')
     Assert-True  'Write-TrivialStub: mentions generated'    ($stubContent -match 'generated|trivial')
 
-    # ── Test: Get-FileComplexity ──────────────────────────────
+    # -- Test: Get-FileComplexity ------------------------------
 
     Write-Host 'Testing Get-FileComplexity ...' -ForegroundColor Cyan
 
@@ -734,7 +734,7 @@ if ($Test) {
     (1..300 | ForEach-Object { "int z$_ = $_;" }) | Set-Content $noCtxFile -Encoding UTF8
     Assert-Equal 'Get-FileComplexity: no ctx, 300 lines = medium' 'medium' (Get-FileComplexity 'src/noctx.cpp' $compDir '')
 
-    # ── Test: Get-StructuralHash ──────────────────────────────
+    # -- Test: Get-StructuralHash ------------------------------
 
     Write-Host 'Testing Get-StructuralHash ...' -ForegroundColor Cyan
 
@@ -763,7 +763,7 @@ if ($Test) {
     $hashEmpty = Get-StructuralHash $structEmpty
     Assert-Equal 'Get-StructuralHash: empty file returns empty' 'empty' $hashEmpty
 
-    # ── Load worker functions for testing ─────────────────────
+    # -- Load worker functions for testing ---------------------
 
     Write-Host 'Loading archgen_worker.ps1 functions ...' -ForegroundColor Cyan
 
@@ -781,7 +781,7 @@ if ($Test) {
         $workerLoaded = $false
     }
 
-    # ── Test: Get-FenceLang (worker) ──────────────────────────
+    # -- Test: Get-FenceLang (worker) --------------------------
 
     if ($workerLoaded) {
         Write-Host 'Testing Get-FenceLang ...' -ForegroundColor Cyan
@@ -828,7 +828,7 @@ if ($Test) {
         Assert-Equal 'Get-FenceLang: path/to/file.cpp' 'cpp' (Get-FenceLang 'Engine/Source/Runtime/foo.cpp' 'c')
     }
 
-    # ── Test: Test-RateLimit (worker) ─────────────────────────
+    # -- Test: Test-RateLimit (worker) -------------------------
 
     if ($workerLoaded) {
         Write-Host 'Testing Test-RateLimit ...' -ForegroundColor Cyan
@@ -849,7 +849,7 @@ if ($Test) {
         Assert-False 'Test-RateLimit: code with 429 var'  (Test-RateLimit '# foo.cpp\nint status = 200;')
     }
 
-    # ── Test: Test-TooLong (worker) ───────────────────────────
+    # -- Test: Test-TooLong (worker) ---------------------------
 
     if ($workerLoaded) {
         Write-Host 'Testing Test-TooLong ...' -ForegroundColor Cyan
@@ -868,7 +868,7 @@ if ($Test) {
         Assert-False 'Test-TooLong: unrelated error'          (Test-TooLong 'Error: network timeout')
     }
 
-    # ── Test: Get-RateLimitResetTime (worker) ─────────────────
+    # -- Test: Get-RateLimitResetTime (worker) -----------------
 
     if ($workerLoaded) {
         Write-Host 'Testing Get-RateLimitResetTime ...' -ForegroundColor Cyan
@@ -901,7 +901,7 @@ if ($Test) {
         Assert-True  'Get-RateLimitResetTime: empty returns null' ($null -eq $t6)
     }
 
-    # ── Test: Format-LocalTime (worker) ───────────────────────
+    # -- Test: Format-LocalTime (worker) -----------------------
 
     if ($workerLoaded) {
         Write-Host 'Testing Format-LocalTime ...' -ForegroundColor Cyan
@@ -916,7 +916,7 @@ if ($Test) {
         Assert-True  'Format-LocalTime: morning contains AM' ($fmtMorning -match '(?i)am')
     }
 
-    # ── Test: Build-Payload (worker) ──────────────────────────
+    # -- Test: Build-Payload (worker) --------------------------
 
     if ($workerLoaded) {
         Write-Host 'Testing Build-Payload ...' -ForegroundColor Cyan
@@ -1044,7 +1044,7 @@ void DoWork() {
         Assert-True  'Build-Payload hdr docs: bundles analyzed doc'     ($p9 -match 'analyzed doc')
     }
 
-    # ── Test: Batch mode relList unwrap fix ───────────────────
+    # -- Test: Batch mode relList unwrap fix -------------------
 
     Write-Host 'Testing batch relList parsing ...' -ForegroundColor Cyan
 
@@ -1074,7 +1074,7 @@ void DoWork() {
     $fixedRelList = @(if ($false) { 'x' -split '\|' } else { $testRel1 })
     Assert-Equal 'relList fix-guard: [0] is full path' $testRel1 $fixedRelList[0]
 
-    # ── Test: Batch response splitting ────────────────────────
+    # -- Test: Batch response splitting ------------------------
 
     Write-Host 'Testing batch response splitting ...' -ForegroundColor Cyan
 
@@ -1097,7 +1097,7 @@ Does C stuff.
     Assert-True  'Batch split: doc 2 has b'  ($splitDocs[1].Trim() -match 'src/b\.cpp')
     Assert-True  'Batch split: doc 3 has c'  ($splitDocs[2].Trim() -match 'src/c\.cpp')
 
-    # ── Test: Cfg helper ──────────────────────────────────────
+    # -- Test: Cfg helper --------------------------------------
 
     Write-Host 'Testing Cfg helper ...' -ForegroundColor Cyan
 
@@ -1114,7 +1114,7 @@ Does C stuff.
 
     $cfg = $savedCfg  # Restore
 
-    # ── Test: Get-Preset exclude patterns ─────────────────────
+    # -- Test: Get-Preset exclude patterns ---------------------
 
     Write-Host 'Testing Get-Preset exclude patterns ...' -ForegroundColor Cyan
 
@@ -1129,7 +1129,7 @@ Does C stuff.
     Assert-False 'No exclude: Runtime'     ('Engine/Source/Runtime/Core/Private/Math.cpp' -match $pu.Exclude)
     Assert-False 'No exclude: Classes'     ('Engine/Source/Runtime/Engine/Classes/Actor.h' -match $pu.Exclude)
 
-    # ── Test: Hash DB round-trip (integration) ────────────────
+    # -- Test: Hash DB round-trip (integration) ----------------
 
     Write-Host 'Testing hash DB round-trip ...' -ForegroundColor Cyan
 
@@ -1168,14 +1168,14 @@ Does C stuff.
     Assert-True  'Hash DB dedup: keeps newest foo entry' ($fooEntry -match 'updated')
 
     } finally {
-        # ── Cleanup temp directory ────────────────────────────
+        # -- Cleanup temp directory ----------------------------
         Remove-Item -Path $testDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 
-    # ── Results ───────────────────────────────────────────────
+    # -- Results -----------------------------------------------
 
     Write-Host ''
-    Write-Host '────────────────────────────────────────────' -ForegroundColor Yellow
+    Write-Host '--------------------------------------------' -ForegroundColor Yellow
     if ($script:testsFailed -eq 0) {
         Write-Host "ALL $($script:testsPassed) TESTS PASSED" -ForegroundColor Green
     } else {
@@ -1185,11 +1185,11 @@ Does C stuff.
             Write-Host $err -ForegroundColor Red
         }
     }
-    Write-Host '────────────────────────────────────────────' -ForegroundColor Yellow
+    Write-Host '--------------------------------------------' -ForegroundColor Yellow
     exit $script:testsFailed
 }
 
-# ── Collect files ─────────────────────────────────────────────
+# -- Collect files ---------------------------------------------
 
 $scanRoot = if ($TargetDir -eq '.') { $repoRoot } else { Join-Path $repoRoot $TargetDir }
 if (-not (Test-Path $scanRoot)) { Write-Err "Target directory not found: $scanRoot"; exit 1 }
@@ -1261,7 +1261,7 @@ if ($batchTemplated -eq '1' -and $queue.Count -gt 0) {
             # Keep only the first (representative); batch the rest later
             $batchQueue.Add($members[0])
             for ($i = 1; $i -lt $members.Count; $i++) {
-                $batchedDocs[$members[$i]] = $members[0]  # maps file → representative
+                $batchedDocs[$members[$i]] = $members[0]  # maps file -> representative
                 $skipBatched++
             }
         } else {
@@ -1271,13 +1271,13 @@ if ($batchTemplated -eq '1' -and $queue.Count -gt 0) {
     $queue = $batchQueue
 }
 
-# ── Opt v2#6: Pattern caching by base class ──────────────────
+# -- Opt v2#6: Pattern caching by base class ------------------
 
-$patternDb = @{}  # baseClass → { count, templateDoc, templateRel }
+$patternDb = @{}  # baseClass -> { count, templateDoc, templateRel }
 
 if ($patternCache -eq '1' -and $hasSerenaContext -and $queue.Count -gt 0) {
     # Phase 1: Classify files by primary base class from LSP context
-    $baseClassMap = @{}  # rel → baseClass
+    $baseClassMap = @{}  # rel -> baseClass
     foreach ($rel in $queue) {
         $ctxPath = Join-Path $serenaContextDir (($rel -replace '/','\') + '.serena_context.txt')
         if (Test-Path $ctxPath) {
@@ -1344,7 +1344,7 @@ if ($patternCache -eq '1' -and $hasSerenaContext -and $queue.Count -gt 0) {
 
 $toDo = $queue.Count
 
-# ── Banner ────────────────────────────────────────────────────
+# -- Banner ----------------------------------------------------
 
 Write-Host '============================================' -ForegroundColor Yellow
 Write-Host '  archgen.ps1 - Architecture Doc Generator' -ForegroundColor Yellow
@@ -1386,7 +1386,7 @@ if ($toDo -eq 0) {
     exit 0
 }
 
-# ── Counter file ──────────────────────────────────────────────
+# -- Counter file ----------------------------------------------
 
 @{ done = 0; fail = 0; skip = $skipUnchanged; total = $total; todo = $toDo; retries = 0 } |
     ConvertTo-Json | Set-Content $counterPath -Encoding UTF8
@@ -1394,7 +1394,7 @@ $script:modelCounts = @{ haiku = 0; sonnet = 0 }
 
 $startTime = [datetime]::Now
 
-# ── Rate-limit status helper ─────────────────────────────────
+# -- Rate-limit status helper ---------------------------------
 
 function Get-RateLimitStatus($rateLimitFile) {
     if (-not (Test-Path $rateLimitFile)) { return '' }
@@ -1409,7 +1409,7 @@ function Get-RateLimitStatus($rateLimitFile) {
     return ''
 }
 
-# ── Progress helper ───────────────────────────────────────────
+# -- Progress helper -------------------------------------------
 
 $script:lastProgressDone = -1
 $script:progressBaseHash = 0
@@ -1467,7 +1467,7 @@ function Show-Progress {
     }
 }
 
-# ── Opt v3#5: Pre-compute shared directory headers ───────────
+# -- Opt v3#5: Pre-compute shared directory headers -----------
 
 $sharedHeaderDir = Join-Path $archDir '.dir_headers'
 if ($bundleHdrs -eq '1' -and $queue.Count -gt 0) {
@@ -1516,7 +1516,7 @@ if ($bundleHdrs -eq '1' -and $queue.Count -gt 0) {
     }
 }
 
-# ── Opt v3#7: Two-phase classification (opt-in) ─────────────
+# -- Opt v3#7: Two-phase classification (opt-in) -------------
 
 if ($useClassify -eq '1' -and $queue.Count -gt 0) {
     Write-Host "Running classification phase..." -ForegroundColor Cyan
@@ -1567,7 +1567,7 @@ if ($useClassify -eq '1' -and $queue.Count -gt 0) {
     }
 }
 
-# ── Opt v2#1: Split queue into batched small files + individual large files ──
+# -- Opt v2#1: Split queue into batched small files + individual large files --
 
 $serenaArg = if ($hasSerenaContext) { $serenaContextDir } else { "" }
 
@@ -1601,7 +1601,7 @@ if ($batchSmallFiles -eq '1' -and $queue.Count -gt 0) {
     }
 }
 
-# ── Dispatch jobs ─────────────────────────────────────────────
+# -- Dispatch jobs ---------------------------------------------
 
 Write-Host "Dispatching $($dispatchQueue.Count) jobs at parallelism=$jobCount ..." -ForegroundColor Green
 
@@ -1714,7 +1714,7 @@ while ($running.Count -gt 0) {
 
 Write-Host ''
 
-# ── Opt #6: Generate batch template docs from representative ──
+# -- Opt #6: Generate batch template docs from representative --
 
 if ($batchedDocs.Count -gt 0) {
     Write-Host "Generating $($batchedDocs.Count) batch-templated docs..." -ForegroundColor Cyan
@@ -1737,7 +1737,7 @@ if ($batchedDocs.Count -gt 0) {
     }
 }
 
-# ── Opt v2#6: Save pattern cache templates from analyzed files ──
+# -- Opt v2#6: Save pattern cache templates from analyzed files --
 
 if ($patternCache -eq '1' -and $hasSerenaContext -and $patternDb.Count -eq 0) {
     # Build templates from newly analyzed files
@@ -1763,7 +1763,7 @@ if ($patternCache -eq '1' -and $hasSerenaContext -and $patternDb.Count -eq 0) {
     }
 }
 
-# ── Result ────────────────────────────────────────────────────
+# -- Result ----------------------------------------------------
 
 if (Test-Path $fatalFlag) {
     $msg = if (Test-Path $fatalMsg) { Get-Content $fatalMsg -Raw } else { 'unknown error' }

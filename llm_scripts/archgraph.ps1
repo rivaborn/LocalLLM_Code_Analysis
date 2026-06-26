@@ -45,7 +45,7 @@ function Read-EnvFile($path) {
     return $vars
 }
 
-# ── Testable functions ────────────────────────────────────────
+# -- Testable functions ----------------------------------------
 
 function SanitizeId($name) { $name -replace '[^A-Za-z0-9_]','_' }
 
@@ -234,7 +234,7 @@ function Build-CombinedMarkdown($callgraphMermaid, $subsystemsMermaid, $funcCoun
     return $mdSb.ToString()
 }
 
-# ── Unit Tests ────────────────────────────────────────────────
+# -- Unit Tests ------------------------------------------------
 
 if ($Test) {
     $script:testsPassed = 0
@@ -268,7 +268,7 @@ if ($Test) {
     Write-Host '============================================' -ForegroundColor Yellow
     Write-Host ''
 
-    # ── Test: SanitizeId ──────────────────────────────────────
+    # -- Test: SanitizeId --------------------------------------
 
     Write-Host 'Testing SanitizeId ...' -ForegroundColor Cyan
 
@@ -283,7 +283,7 @@ if ($Test) {
     Assert-Equal 'SanitizeId: all special chars'    '___'             (SanitizeId '!@#')
     Assert-Equal 'SanitizeId: empty string'         ''                (SanitizeId '')
 
-    # ── Test: Parse-GraphDoc - basic extraction ───────────────
+    # -- Test: Parse-GraphDoc - basic extraction ---------------
 
     Write-Host 'Testing Parse-GraphDoc: basic extraction ...' -ForegroundColor Cyan
 
@@ -315,7 +315,7 @@ if ($Test) {
     Assert-Equal 'Parse basic: edge 1 sub'        'Engine'     $r1.Edges[0].sub
     Assert-Equal 'Parse basic: edge 3 callee'     'RandInit'   $r1.Edges[2].callee
 
-    # ── Test: Parse-GraphDoc - subsystem detection ────────────
+    # -- Test: Parse-GraphDoc - subsystem detection ------------
 
     Write-Host 'Testing Parse-GraphDoc: subsystem detection ...' -ForegroundColor Cyan
 
@@ -331,7 +331,7 @@ if ($Test) {
     $rSub3 = Parse-GraphDoc $docSub3
     Assert-Equal 'Subsystem: first component'     'Engine' $rSub3.Subsystem
 
-    # ── Test: Parse-GraphDoc - section transitions ────────────
+    # -- Test: Parse-GraphDoc - section transitions ------------
 
     Write-Host 'Testing Parse-GraphDoc: section transitions ...' -ForegroundColor Cyan
 
@@ -363,7 +363,7 @@ if ($Test) {
     Assert-Equal 'Transitions: DoWork found'      'DoWork' $rTrans.FuncFile[1].func
     Assert-Equal 'Transitions: edge count'        1  $rTrans.Edges.Count
 
-    # ── Test: Parse-GraphDoc - empty/null ─────────────────────
+    # -- Test: Parse-GraphDoc - empty/null ---------------------
 
     Write-Host 'Testing Parse-GraphDoc: edge cases ...' -ForegroundColor Cyan
 
@@ -375,7 +375,7 @@ if ($Test) {
     $rNull = Parse-GraphDoc $null
     Assert-Equal 'Parse null: no funcs'           0  $rNull.FuncFile.Count
 
-    # ── Test: Parse-GraphDoc - backtick/bold func names ───────
+    # -- Test: Parse-GraphDoc - backtick/bold func names -------
 
     Write-Host 'Testing Parse-GraphDoc: func name formatting ...' -ForegroundColor Cyan
 
@@ -391,7 +391,7 @@ if ($Test) {
     Assert-Equal 'Fmt: backtick stripped'         'TickedFunc' $rFmt.FuncFile[0].func
     Assert-Equal 'Fmt: bold stripped'             'BoldFunc'   $rFmt.FuncFile[1].func
 
-    # ── Test: Get-SignificantFunctions ─────────────────────────
+    # -- Test: Get-SignificantFunctions -------------------------
 
     Write-Host 'Testing Get-SignificantFunctions ...' -ForegroundColor Cyan
 
@@ -428,7 +428,7 @@ if ($Test) {
     $sigEmpty = Get-SignificantFunctions $emptyEdges 2
     Assert-Equal 'Significant empty: count 0'         0 $sigEmpty.Count
 
-    # ── Test: Build-CallGraph ─────────────────────────────────
+    # -- Test: Build-CallGraph ---------------------------------
 
     Write-Host 'Testing Build-CallGraph ...' -ForegroundColor Cyan
 
@@ -492,7 +492,7 @@ if ($Test) {
     Assert-False 'CallGraph: non-sig Tick excluded'   ($cgPartial -match 'Init --> Tick')
     Assert-True  'CallGraph: sig Init->Render kept'   ($cgPartial -match 'Init --> Render')
 
-    # ── Test: Get-CrossSubsystemEdges ─────────────────────────
+    # -- Test: Get-CrossSubsystemEdges -------------------------
 
     Write-Host 'Testing Get-CrossSubsystemEdges ...' -ForegroundColor Cyan
 
@@ -527,7 +527,7 @@ if ($Test) {
     $crossUnknown = Get-CrossSubsystemEdges $cssEdgesUnknown $cssFuncs
     Assert-Equal 'CrossSub: unknown callee ignored'   0 $crossUnknown.Count
 
-    # ── Test: Build-SubsystemDiagram ──────────────────────────
+    # -- Test: Build-SubsystemDiagram --------------------------
 
     Write-Host 'Testing Build-SubsystemDiagram ...' -ForegroundColor Cyan
 
@@ -550,7 +550,7 @@ if ($Test) {
     Assert-True  'SubsDiagram empty: nodes present'   ($ssEmpty -match 'Core')
     Assert-False 'SubsDiagram empty: no edges'        ($ssEmpty -match ' -->\|')
 
-    # ── Test: Build-CombinedMarkdown ──────────────────────────
+    # -- Test: Build-CombinedMarkdown --------------------------
 
     Write-Host 'Testing Build-CombinedMarkdown ...' -ForegroundColor Cyan
 
@@ -568,7 +568,7 @@ if ($Test) {
     Assert-True  'Markdown: min sig in description'   ($md -match '2\+ incoming')
     Assert-True  'Markdown: max edges in description' ($md -match '150 edges')
 
-    # ── Test: End-to-end integration ──────────────────────────
+    # -- Test: End-to-end integration --------------------------
 
     Write-Host 'Testing end-to-end integration ...' -ForegroundColor Cyan
 
@@ -637,7 +637,7 @@ if ($Test) {
     Assert-True  'E2E md: has edge stat'              ($e2eMd -match 'Total call edges: 4')
     Assert-True  'E2E md: has subsystem stat'         ($e2eMd -match 'Subsystems: 3')
 
-    # ── Results ───────────────────────────────────────────────
+    # -- Results -----------------------------------------------
 
     Write-Host ''
     Write-Host '--------------------------------------------' -ForegroundColor Yellow
@@ -654,7 +654,7 @@ if ($Test) {
     exit $script:testsFailed
 }
 
-# ── Main execution ────────────────────────────────────────────
+# -- Main execution --------------------------------------------
 
 $cfg = Read-EnvFile $EnvFile
 

@@ -72,7 +72,7 @@ function Test-TooLong($text) {
     return $false
 }
 
-# ── Testable helper: extract diagram data from doc lines ─────
+# -- Testable helper: extract diagram data from doc lines -----
 
 function Extract-DiagramSections($lines) {
     $sb = [System.Text.StringBuilder]::new()
@@ -91,7 +91,7 @@ function Extract-DiagramSections($lines) {
     return $sb.ToString()
 }
 
-# ── Testable helper: detect overview mode ─────────────────────
+# -- Testable helper: detect overview mode ---------------------
 
 function Get-OverviewMode($chunkedFlag, $singleFlag, $diagramLines, $chunkThreshold) {
     if ($chunkedFlag) { return 'chunked' }
@@ -100,7 +100,7 @@ function Get-OverviewMode($chunkedFlag, $singleFlag, $diagramLines, $chunkThresh
     return 'single'
 }
 
-# ── Testable helper: doc file filter ──────────────────────────
+# -- Testable helper: doc file filter --------------------------
 
 function Test-OverviewDocIncluded($name, $fullName) {
     if ($fullName -match '[/\\]\.(archgen|overview|pass2)_state[/\\]') { return $false }
@@ -109,7 +109,7 @@ function Test-OverviewDocIncluded($name, $fullName) {
     return $true
 }
 
-# ── File helpers ──────────────────────────────────────────────
+# -- File helpers ----------------------------------------------
 
 function Get-PerFileDocs($root) {
     return @(Get-ChildItem -Path $root -Recurse -Filter '*.md' -File -ErrorAction SilentlyContinue |
@@ -170,7 +170,7 @@ function Get-Subsystems($docRoot, $relPath, $threshold, $depth = 0) {
     return $result
 }
 
-# ── Prompt constructors ───────────────────────────────────────
+# -- Prompt constructors ---------------------------------------
 
 function Get-SubsystemPrompt($desc, $content) {
     return @"
@@ -286,7 +286,7 @@ END INPUT DOC INDEX
 "@
 }
 
-# ── Unit Tests ────────────────────────────────────────────────
+# -- Unit Tests ------------------------------------------------
 
 if ($Test) {
     $script:testsPassed = 0
@@ -325,7 +325,7 @@ if ($Test) {
 
     try {
 
-    # ── Test: Cfg ─────────────────────────────────────────────
+    # -- Test: Cfg ---------------------------------------------
 
     Write-Host 'Testing Cfg ...' -ForegroundColor Cyan
 
@@ -336,7 +336,7 @@ if ($Test) {
     Assert-Equal 'Cfg: numeric value'             '8'       (Cfg $testCfg 'JOBS' '2')
     Assert-Equal 'Cfg: no default'                ''        (Cfg $testCfg 'MISSING')
 
-    # ── Test: Test-RateLimit ──────────────────────────────────
+    # -- Test: Test-RateLimit ----------------------------------
 
     Write-Host 'Testing Test-RateLimit ...' -ForegroundColor Cyan
 
@@ -359,7 +359,7 @@ if ($Test) {
     Assert-False 'RateLimit: normal response'         (Test-RateLimit 'This is a normal analysis result.')
     Assert-False 'RateLimit: empty string'            (Test-RateLimit '')
 
-    # ── Test: Test-TooLong ────────────────────────────────────
+    # -- Test: Test-TooLong ------------------------------------
 
     Write-Host 'Testing Test-TooLong ...' -ForegroundColor Cyan
 
@@ -372,7 +372,7 @@ if ($Test) {
     Assert-False 'TooLong: normal text'               (Test-TooLong 'This is a normal response.')
     Assert-False 'TooLong: empty'                     (Test-TooLong '')
 
-    # ── Test: Test-OverviewDocIncluded ────────────────────────
+    # -- Test: Test-OverviewDocIncluded ------------------------
 
     Write-Host 'Testing Test-OverviewDocIncluded ...' -ForegroundColor Cyan
 
@@ -395,7 +395,7 @@ if ($Test) {
     Assert-False 'DocIncl: overview_state'            (Test-OverviewDocIncluded 'data.md' 'C:\arch\.overview_state\data.md')
     Assert-False 'DocIncl: pass2_state'               (Test-OverviewDocIncluded 'data.md' 'C:\arch\.pass2_state\data.md')
 
-    # ── Test: Extract-DiagramSections ─────────────────────────
+    # -- Test: Extract-DiagramSections -------------------------
 
     Write-Host 'Testing Extract-DiagramSections ...' -ForegroundColor Cyan
 
@@ -477,7 +477,7 @@ if ($Test) {
     Assert-True  'Extract stub: has purpose'          ($extractStub -match 'Auto-generated')
     Assert-True  'Extract stub: has responsibilities' ($extractStub -match 'Boilerplate')
 
-    # ── Test: Get-OverviewMode ────────────────────────────────
+    # -- Test: Get-OverviewMode --------------------------------
 
     Write-Host 'Testing Get-OverviewMode ...' -ForegroundColor Cyan
 
@@ -490,7 +490,7 @@ if ($Test) {
     Assert-Equal 'Mode: auto way above'           'chunked' (Get-OverviewMode $false $false 5000 1500)
     Assert-Equal 'Mode: auto 0 lines'             'single'  (Get-OverviewMode $false $false 0 1500)
 
-    # ── Test: Get-SubsystemPrompt ─────────────────────────────
+    # -- Test: Get-SubsystemPrompt -----------------------------
 
     Write-Host 'Testing Get-SubsystemPrompt ...' -ForegroundColor Cyan
 
@@ -506,7 +506,7 @@ if ($Test) {
     Assert-True  'SubPrompt: has END marker'          ($subPrompt -match 'END INPUT DOC INDEX')
     Assert-True  'SubPrompt: content injected'        ($subPrompt -match 'doc content here')
 
-    # ── Test: Get-SynthesisPrompt ─────────────────────────────
+    # -- Test: Get-SynthesisPrompt -----------------------------
 
     Write-Host 'Testing Get-SynthesisPrompt ...' -ForegroundColor Cyan
 
@@ -526,7 +526,7 @@ if ($Test) {
     Assert-True  'SynPrompt: has END marker'          ($synPrompt -match 'END SUBSYSTEM OVERVIEWS')
     Assert-True  'SynPrompt: content injected'        ($synPrompt -match 'overviews here')
 
-    # ── Test: Get-SinglePassPrompt ────────────────────────────
+    # -- Test: Get-SinglePassPrompt ----------------------------
 
     Write-Host 'Testing Get-SinglePassPrompt ...' -ForegroundColor Cyan
 
@@ -541,7 +541,7 @@ if ($Test) {
     Assert-True  'SinglePrompt: content injected'     ($spPrompt -match 'single pass content')
     Assert-True  'SinglePrompt: infer language rule'  ($spPrompt -match 'Infer the programming language')
 
-    # ── Test: Get-PerFileDocs (integration with temp files) ───
+    # -- Test: Get-PerFileDocs (integration with temp files) ---
 
     Write-Host 'Testing Get-PerFileDocs ...' -ForegroundColor Cyan
 
@@ -566,7 +566,7 @@ if ($Test) {
     Assert-True  'GetPerFileDocs: has Actor.cpp.md'   ($names -contains 'Actor.cpp.md')
     Assert-True  'GetPerFileDocs: has World.h.md'     ($names -contains 'World.h.md')
 
-    # ── Test: Build-DiagramData (integration) ─────────────────
+    # -- Test: Build-DiagramData (integration) -----------------
 
     Write-Host 'Testing Build-DiagramData ...' -ForegroundColor Cyan
 
@@ -615,7 +615,7 @@ if ($Test) {
     Assert-False 'DiagramData: no Key Functions'      ($diagContent -match 'StartEngine')
     Assert-False 'DiagramData: no Key Types'          ($diagContent -match 'RenderContext')
 
-    # ── Test: Get-Subsystems (integration with temp dirs) ─────
+    # -- Test: Get-Subsystems (integration with temp dirs) -----
 
     Write-Host 'Testing Get-Subsystems ...' -ForegroundColor Cyan
 
@@ -676,7 +676,7 @@ if ($Test) {
         Remove-Item -Path $testDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 
-    # ── Results ───────────────────────────────────────────────
+    # -- Results -----------------------------------------------
 
     Write-Host ''
     Write-Host '--------------------------------------------' -ForegroundColor Yellow
@@ -693,7 +693,7 @@ if ($Test) {
     exit $script:testsFailed
 }
 
-# ── Main execution ────────────────────────────────────────────
+# -- Main execution --------------------------------------------
 
 $cfg = Read-EnvFile $EnvFile
 
@@ -718,7 +718,7 @@ $outputFmt     = Cfg $cfg 'CLAUDE_OUTPUT_FORMAT' 'text'
 $codebaseDesc  = Cfg $cfg 'CODEBASE_DESC'        'game engine / game codebase'
 $chunkThreshold = [int](Cfg $cfg 'CHUNK_THRESHOLD' '1500')
 
-# ── Local LLM backend (LLMConfig) ─────────────────────────────
+# -- Local LLM backend (LLMConfig) -----------------------------
 . (Join-Path $PSScriptRoot 'llm_core.ps1')
 $llmBackend   = Get-LLMBackend -Cfg $cfg
 $llmEndpoint  = ''

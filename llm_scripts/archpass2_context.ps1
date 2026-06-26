@@ -28,7 +28,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# ── Testable functions ────────────────────────────────────────
+# -- Testable functions ----------------------------------------
 
 function Get-SubsystemKeys($relDir) {
     $keys = [System.Collections.Generic.List[string]]::new()
@@ -117,7 +117,7 @@ function Get-DocRelPath($docFullName, $archDir) {
     return $docRel -replace '\.md$', ''
 }
 
-# ── Unit Tests ────────────────────────────────────────────────
+# -- Unit Tests ------------------------------------------------
 
 if ($Test) {
     $script:testsPassed = 0
@@ -151,7 +151,7 @@ if ($Test) {
     Write-Host '============================================' -ForegroundColor Yellow
     Write-Host ''
 
-    # ── Test: Get-SubsystemKeys ───────────────────────────────
+    # -- Test: Get-SubsystemKeys -------------------------------
 
     Write-Host 'Testing Get-SubsystemKeys ...' -ForegroundColor Cyan
 
@@ -177,7 +177,7 @@ if ($Test) {
     $k4 = Get-SubsystemKeys ''
     Assert-Equal 'SubKeys empty: count'          0 $k4.Count
 
-    # ── Test: Extract-ArchSections ────────────────────────────
+    # -- Test: Extract-ArchSections ----------------------------
 
     Write-Host 'Testing Extract-ArchSections ...' -ForegroundColor Cyan
 
@@ -249,7 +249,7 @@ if ($Test) {
     $hitsCI = Extract-ArchSections $archLines @('core')
     Assert-True  'ArchSections case: finds Core'        ($hitsCI.Count -gt 0)
 
-    # ── Test: Extract-XrefEntries ─────────────────────────────
+    # -- Test: Extract-XrefEntries -----------------------------
 
     Write-Host 'Testing Extract-XrefEntries ...' -ForegroundColor Cyan
 
@@ -286,7 +286,7 @@ if ($Test) {
     $x5 = Extract-XrefEntries $xrefLines 'Function' 'Function'
     Assert-True  'Xref header matches: finds header'    ($x5.Count -gt 0)
 
-    # ── Test: Build-TargetedContext ───────────────────────────
+    # -- Test: Build-TargetedContext ---------------------------
 
     Write-Host 'Testing Build-TargetedContext ...' -ForegroundColor Cyan
 
@@ -336,7 +336,7 @@ if ($Test) {
     $entryLines = @($ctx5 | Where-Object { $_ -match '^\| func' })
     Assert-Equal 'Context xref cap: 50 entries'         50 $entryLines.Count
 
-    # ── Test: Get-DocRelPath ──────────────────────────────────
+    # -- Test: Get-DocRelPath ----------------------------------
 
     Write-Host 'Testing Get-DocRelPath ...' -ForegroundColor Cyan
 
@@ -345,7 +345,7 @@ if ($Test) {
     Assert-Equal 'DocRelPath: backslash' 'src/file.cpp' `
         (Get-DocRelPath 'C:\arch\src\file.cpp.md' 'C:\arch')
 
-    # ── Test: End-to-end integration ──────────────────────────
+    # -- Test: End-to-end integration --------------------------
 
     Write-Host 'Testing end-to-end integration ...' -ForegroundColor Cyan
 
@@ -398,7 +398,7 @@ if ($Test) {
     # Should NOT have Core content (different subsystem)
     Assert-False 'E2E: no Core content'                ($e2eJoined -match 'base types and containers')
 
-    # ── Results ───────────────────────────────────────────────
+    # -- Results -----------------------------------------------
 
     Write-Host ''
     Write-Host '--------------------------------------------' -ForegroundColor Yellow
@@ -415,7 +415,7 @@ if ($Test) {
     exit $script:testsFailed
 }
 
-# ── Main execution ────────────────────────────────────────────
+# -- Main execution --------------------------------------------
 
 $repoRoot = (Get-Location).Path
 try {

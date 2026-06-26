@@ -312,7 +312,7 @@ $outputFmt  = Cfg 'CLAUDE_OUTPUT_FORMAT' 'text'
 $includeRx  = Cfg 'INCLUDE_EXT_REGEX' '\.(cpp|h|hpp|cc|cxx|inl|cs)$'
 $excludeRx  = Cfg 'EXCLUDE_DIRS_REGEX' '[/\\](\.git|architecture|Binaries|Build|DerivedDataCache|Intermediate|Saved|\.vs|ThirdParty|GeneratedFiles|AutomationTool)([/\\]|$)'
 
-# ── Local LLM backend (LLMConfig) ─────────────────────────────
+# -- Local LLM backend (LLMConfig) -----------------------------
 . (Join-Path $PSScriptRoot 'llm_core.ps1')
 $llmBackend   = Get-LLMBackend -Cfg $script:cfg
 $llmEndpoint  = ''
