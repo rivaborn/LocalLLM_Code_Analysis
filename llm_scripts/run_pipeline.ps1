@@ -140,14 +140,17 @@ function Write-RunReport($Overall) {
         }
     }
 
-    $blobLedger = Join-Path $archState 'datablob.tsv'
-    $blobs = @()
-    if (Test-Path $blobLedger) { $blobs = @(Get-Content $blobLedger -ErrorAction SilentlyContinue | Where-Object { $_ -ne '' } | Sort-Object -Unique) }
+    $blobLines = @()
+    foreach ($d in @($archState, $pass2St)) {
+        $led = Join-Path $d 'datablob.tsv'
+        if (Test-Path $led) { $blobLines += @(Get-Content $led -ErrorAction SilentlyContinue) }
+    }
+    $blobs = @($blobLines | Where-Object { $_ -ne '' } | Sort-Object -Unique)
     $o += ""
     $o += "## Data-blob skips"
     $o += ""
     $o += "Generated data-table files (giant literal arrays / LUTs) detected and stubbed by the"
-    $o += "data-blob detector instead of being sent to the LLM: **$($blobs.Count)**."
+    $o += "data-blob detector (Pass 1 + Pass 2) instead of being sent to the LLM: **$($blobs.Count)**."
     if ($blobs.Count -gt 0) {
         $o += ""
         foreach ($b in $blobs) { $o += "- ``$b``" }
@@ -249,10 +252,13 @@ function Invoke-ModelPreload($Model) {
 $archState = Join-Path $archDir '.archgen_state'
 $pass2St   = Join-Path $archDir '.pass2_state'
 
-# Clear the data-blob ledger so the report reflects only this run (archgen
-# appends to it; the orchestrator owns its lifecycle, like failures.tsv).
-$dataBlobLedger = Join-Path $archState 'datablob.tsv'
-if (Test-Path $dataBlobLedger) { Remove-Item $dataBlobLedger -Force -ErrorAction SilentlyContinue }
+# Clear the data-blob ledgers (Pass 1 + Pass 2) so the report reflects only this
+# run (the stages append to them; the orchestrator owns their lifecycle, like
+# failures.tsv).
+foreach ($d in @($archState, $pass2St)) {
+    $led = Join-Path $d 'datablob.tsv'
+    if (Test-Path $led) { Remove-Item $led -Force -ErrorAction SilentlyContinue }
+}
 
 Write-Host "============================================" -ForegroundColor Yellow
 Write-Host "  run_pipeline.ps1 - full pipeline" -ForegroundColor Yellow

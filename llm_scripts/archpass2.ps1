@@ -435,6 +435,9 @@ $excludeRx     = Cfg $cfg 'EXCLUDE_DIRS_REGEX' '[/\\](\.git|architecture|build|o
 $extraExclude  = Cfg $cfg 'EXTRA_EXCLUDE_REGEX' ''
 $defaultFence  = Cfg $cfg 'DEFAULT_FENCE' 'c'
 $codebaseDesc  = Cfg $cfg 'CODEBASE_DESC' 'game engine / game codebase'
+$detectDataBlob   = Cfg $cfg 'DETECT_DATA_BLOB' '1'
+$dataBlobMinLines = [int](Cfg $cfg 'DATA_BLOB_MIN_LINES' '2000')
+$dataBlobFrac     = [double](Cfg $cfg 'DATA_BLOB_FRACTION' '0.6')
 
 # -- Local LLM backend (LLMConfig) -----------------------------
 . (Join-Path $PSScriptRoot 'llm_core.ps1')
@@ -503,6 +506,7 @@ if ($missing.Count -gt 0) {
 
 # State files
 $hashDbPath    = Join-Path $stateDir 'hashes.tsv'
+$dataBlobLedger = Join-Path $stateDir 'datablob.tsv'   # files stubbed by the data-blob detector (Pass 2)
 $errorLog      = Join-Path $stateDir 'last_claude_error.log'
 $fatalFlag     = Join-Path $stateDir 'fatal.flag'
 $fatalMsg      = Join-Path $stateDir 'fatal.msg'
@@ -603,6 +607,29 @@ if (Test-Path $hashDbPath) {
     }
 }
 
+# -- Data-blob detector (mirror of archgen.ps1; keep the two in sync) ---------
+# Large generated literal tables (LUTs / numeric arrays) have no architecture to
+# document, exhaust the thinking model, and overflow the sonnet fallback. Stub
+# them instead of re-failing in Pass 2.
+function Test-DataBlobFile($fullPath, $minLines, $dataFrac) {
+    $lines = @(Get-Content $fullPath -ErrorAction SilentlyContinue)
+    if ($lines.Count -lt $minLines) { return $false }
+    $code = 0; $data = 0
+    foreach ($ln in $lines) {
+        $t = $ln.Trim()
+        if ($t -eq '' -or $t -match '^(//|/\*|\*|\*/|#)') { continue }   # blank / comment / preprocessor
+        $code++
+        if ($t -match '^[\s{}()]*((0[xX][0-9A-Fa-f]+|[+-]?[0-9][0-9.eEfFuUlL+-]*)[\s,;{}()]*)+$') { $data++ }
+    }
+    if ($code -eq 0) { return $false }
+    return (($data / $code) -ge $dataFrac)
+}
+
+function Write-DataBlobStub($rel, $outPath) {
+    $stub = "# $rel`n`n## File Purpose`nGenerated data table (lookup tables / precomputed numeric arrays). No architecture to document; skipped by the data-blob detector.`n`n## Core Responsibilities`n- Holds hardcoded numeric/hex literal data consumed elsewhere`n"
+    $stub | Set-Content -Path $outPath -Encoding UTF8
+}
+
 # -- Collect files ---------------------------------------------
 
 $scanRoot = if ($TargetDir -eq '.') { $repoRoot } else { Join-Path $repoRoot $TargetDir }
@@ -630,13 +657,27 @@ if ($total -eq 0) {
 
 $queue = [System.Collections.Generic.List[string]]::new()
 $skipUnchanged = 0
+$dataBlobN     = 0
 foreach ($rel in $files) {
     $src = Join-Path $repoRoot ($rel -replace '/','\\')
     $out = Join-Path $archDir  (($rel -replace '/','\\') + '.pass2.md')
     $sha = Get-SHA1 $src
     if ((Test-Path $out) -and (-not $oldSha.ContainsKey($rel) -or $oldSha[$rel] -eq $sha)) {
         $skipUnchanged++
-    } else { $queue.Add($rel) }
+        continue
+    }
+    # Skip giant generated data tables (same detector as Pass 1) -- they exhaust the
+    # thinking model and overflow the sonnet fallback; stub instead of re-failing.
+    if ($detectDataBlob -eq '1' -and (Test-DataBlobFile $src $dataBlobMinLines $dataBlobFrac)) {
+        $outDir = Split-Path $out -Parent
+        New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+        Write-DataBlobStub $rel $out
+        [System.IO.File]::AppendAllText($hashDbPath, "$sha`t$rel`n")
+        [System.IO.File]::AppendAllText($dataBlobLedger, "$rel`n")
+        $dataBlobN++
+        continue
+    }
+    $queue.Add($rel)
 }
 
 # -- Selective scoring: -Top N limits Pass 2 to highest-value files ------
@@ -699,7 +740,8 @@ Write-Host "Jobs:         $jobCount"
 $modeStr = if ($Top -gt 0) { "SELECTIVE (top $Top)" } else { "ALL" }
 if ($Delta) { $modeStr += " + DELTA" }
 Write-Host "Mode:         $modeStr"
-Write-Host "Files:        $total (skipped: $skipUnchanged, to process: $toDo)"
+$blobNote = if ($dataBlobN -gt 0) { " + $dataBlobN data-blob" } else { '' }
+Write-Host "Files:        $total (skipped: $skipUnchanged unchanged$blobNote, to process: $toDo)"
 Write-Host "Prompt:       $promptFileP2"
 Write-Host "Context:      $archOverview"
 Write-Host "              $xrefIndex"
@@ -873,4 +915,7 @@ if (Test-Path $hashDbPath) {
     $lines | Sort-Object | Set-Content $hashDbPath -Encoding UTF8
 }
 
+if ($dataBlobN -gt 0) {
+    Write-Host "Data-blob detector: skipped $dataBlobN generated data-table file(s) (stubbed, not sent to the LLM). See $dataBlobLedger" -ForegroundColor Cyan
+}
 Write-Host "Done. Pass-2 docs: architecture/<path>.pass2.md" -ForegroundColor Green
