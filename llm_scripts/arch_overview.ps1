@@ -940,6 +940,9 @@ Write-Host ""
 
 # Tier 1
 function Get-ModelStats {
+    # haiku/sonnet split is meaningful only on the claude backend; local backends
+    # run a single model, so show its name instead of a misleading 0%/100% split.
+    if ($llmBackend -ne 'claude') { return "  model=$llmModel" }
     $mTotal = $script:modelCounts.haiku + $script:modelCounts.sonnet
     if ($mTotal -eq 0) { return '' }
     $hPct = [int][math]::Round(100 * $script:modelCounts.haiku / $mTotal)
@@ -1119,11 +1122,16 @@ foreach ($sub in $subsystems) {
     $subArch = Join-Path $archDir "$sub architecture.md"
     if (Test-Path $subArch) { Write-Host "  - $subArch" }
 }
-$mTotal = $script:modelCounts.haiku + $script:modelCounts.sonnet
-if ($mTotal -gt 0) {
-    $hPct = [int][math]::Round(100 * $script:modelCounts.haiku / $mTotal)
-    $sPct = 100 - $hPct
-    Write-Host "Model usage:    $mTotal calls  haiku=${hPct}% sonnet=${sPct}%"
+if ($llmBackend -ne 'claude') {
+    $mTotal = $script:modelCounts.haiku + $script:modelCounts.sonnet
+    if ($mTotal -gt 0) { Write-Host "Model usage:    $mTotal calls  model=$llmModel" }
+} else {
+    $mTotal = $script:modelCounts.haiku + $script:modelCounts.sonnet
+    if ($mTotal -gt 0) {
+        $hPct = [int][math]::Round(100 * $script:modelCounts.haiku / $mTotal)
+        $sPct = 100 - $hPct
+        Write-Host "Model usage:    $mTotal calls  haiku=${hPct}% sonnet=${sPct}%"
+    }
 }
 Write-Host ""
 Write-Host "Done." -ForegroundColor Green
