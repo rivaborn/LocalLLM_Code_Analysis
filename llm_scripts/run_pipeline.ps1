@@ -140,6 +140,19 @@ function Write-RunReport($Overall) {
         }
     }
 
+    $blobLedger = Join-Path $archState 'datablob.tsv'
+    $blobs = @()
+    if (Test-Path $blobLedger) { $blobs = @(Get-Content $blobLedger -ErrorAction SilentlyContinue | Where-Object { $_ -ne '' } | Sort-Object -Unique) }
+    $o += ""
+    $o += "## Data-blob skips"
+    $o += ""
+    $o += "Generated data-table files (giant literal arrays / LUTs) detected and stubbed by the"
+    $o += "data-blob detector instead of being sent to the LLM: **$($blobs.Count)**."
+    if ($blobs.Count -gt 0) {
+        $o += ""
+        foreach ($b in $blobs) { $o += "- ``$b``" }
+    }
+
     $o += ""
     $o += "## Outputs (under target scope)"
     $o += ""
@@ -235,6 +248,11 @@ function Invoke-ModelPreload($Model) {
 
 $archState = Join-Path $archDir '.archgen_state'
 $pass2St   = Join-Path $archDir '.pass2_state'
+
+# Clear the data-blob ledger so the report reflects only this run (archgen
+# appends to it; the orchestrator owns its lifecycle, like failures.tsv).
+$dataBlobLedger = Join-Path $archState 'datablob.tsv'
+if (Test-Path $dataBlobLedger) { Remove-Item $dataBlobLedger -Force -ErrorAction SilentlyContinue }
 
 Write-Host "============================================" -ForegroundColor Yellow
 Write-Host "  run_pipeline.ps1 - full pipeline" -ForegroundColor Yellow

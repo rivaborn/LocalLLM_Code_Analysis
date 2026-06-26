@@ -161,6 +161,9 @@ $highModel    = Cfg 'HIGH_COMPLEXITY_MODEL' 'sonnet'
 $bundleHdrDoc = Cfg 'BUNDLE_HEADER_DOCS' '0'
 $batchTemplated = Cfg 'BATCH_TEMPLATED'  '0'
 $minTrivialLines = [int](Cfg 'MIN_TRIVIAL_LINES' '20')
+$detectDataBlob   = Cfg 'DETECT_DATA_BLOB' '1'
+$dataBlobMinLines = [int](Cfg 'DATA_BLOB_MIN_LINES' '2000')
+$dataBlobFrac     = [double](Cfg 'DATA_BLOB_FRACTION' '0.6')
 $batchSmallFiles = if ($NoBatch -ne '') { '0' } else { Cfg 'BATCH_SMALL_FILES' '1' }
 $batchMaxLines   = [int](Cfg 'BATCH_MAX_LINES' '100')
 $batchSize       = [int](Cfg 'BATCH_SIZE' '4')
@@ -302,6 +305,7 @@ $patternCacheDir = Join-Path $stateDir 'pattern_cache'
 if ($patternCache -eq '1') { New-Item -ItemType Directory -Force -Path $patternCacheDir | Out-Null }
 
 $hashDbPath    = Join-Path $stateDir 'hashes.tsv'
+$dataBlobLedger = Join-Path $stateDir 'datablob.tsv'   # append-only list of files stubbed by the data-blob detector
 $errorLog      = Join-Path $stateDir 'last_claude_error.log'
 $fatalFlag     = Join-Path $stateDir 'fatal.flag'
 $fatalMsg      = Join-Path $stateDir 'fatal.msg'
@@ -367,6 +371,33 @@ function Test-TrivialFile($rel, $fullPath, $minLines) {
 
 function Write-TrivialStub($rel, $outPath) {
     $stub = "# $rel`n`n## File Purpose`nAuto-generated or trivial file. No detailed analysis needed.`n`n## Core Responsibilities`n- Boilerplate / generated code`n"
+    $stub | Set-Content -Path $outPath -Encoding UTF8
+}
+
+function Test-DataBlobFile($fullPath, $minLines, $dataFrac) {
+    # Detects large generated lookup-table / data-array headers (e.g. *LUTsData.h):
+    # thousands of hardcoded numeric/hex literals with no architecture to document.
+    # Such files exhaust a thinking model's budget and overflow even the sonnet
+    # fallback (too big for its context), so we stub them like other generated
+    # files instead of burning retries + a doomed escalation on them.
+    $lines = @(Get-Content $fullPath -ErrorAction SilentlyContinue)
+    if ($lines.Count -lt $minLines) { return $false }
+    $code = 0; $data = 0
+    foreach ($ln in $lines) {
+        $t = $ln.Trim()
+        if ($t -eq '' -or $t -match '^(//|/\*|\*|\*/|#)') { continue }   # blank / comment / preprocessor
+        $code++
+        # A "data" line is purely numeric/hex literals separated by , ; { } ( ) --
+        # identifiers/keywords never match (the numeric branch must start with a
+        # digit, the hex branch with 0x), so real code lines are not counted.
+        if ($t -match '^[\s{}()]*((0[xX][0-9A-Fa-f]+|[+-]?[0-9][0-9.eEfFuUlL+-]*)[\s,;{}()]*)+$') { $data++ }
+    }
+    if ($code -eq 0) { return $false }
+    return (($data / $code) -ge $dataFrac)
+}
+
+function Write-DataBlobStub($rel, $outPath) {
+    $stub = "# $rel`n`n## File Purpose`nGenerated data table (lookup tables / precomputed numeric arrays). No architecture to document; skipped by the data-blob detector.`n`n## Core Responsibilities`n- Holds hardcoded numeric/hex literal data consumed elsewhere`n"
     $stub | Set-Content -Path $outPath -Encoding UTF8
 }
 
@@ -1215,6 +1246,7 @@ if ($total -eq 0) { Write-Err "No matching source files found under '$scanRoot'"
 $queue         = [System.Collections.Generic.List[string]]::new()
 $skipUnchanged = 0
 $skipTrivialN  = 0
+$dataBlobN     = 0
 $skipBatched   = 0
 $skipPatternCached = 0
 $skipClassified = 0
@@ -1229,16 +1261,26 @@ foreach ($rel in $files) {
         continue
     }
 
-    # Opt #1: Skip generated/trivial files - write stub doc instead
-    if ($skipTrivial -eq '1' -and (Test-TrivialFile $rel $src $minTrivialLines)) {
-        $outDir = Split-Path $out -Parent
-        New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-        Write-TrivialStub $rel $out
-        # Record hash so we skip next run
-        $hashStr = ($sha)
-        [System.IO.File]::AppendAllText($hashDbPath, "$sha`t$rel`n")
-        $skipTrivialN++
-        continue
+    # Opt #1: Skip generated/trivial files - write stub doc instead.
+    # Data blobs (giant generated literal tables) are detected separately so we
+    # can report how many were skipped; they fall through to the same stub path.
+    if ($skipTrivial -eq '1') {
+        $isBlob = ($detectDataBlob -eq '1') -and (Test-DataBlobFile $src $dataBlobMinLines $dataBlobFrac)
+        if ($isBlob -or (Test-TrivialFile $rel $src $minTrivialLines)) {
+            $outDir = Split-Path $out -Parent
+            New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+            if ($isBlob) {
+                Write-DataBlobStub $rel $out
+                [System.IO.File]::AppendAllText($dataBlobLedger, "$rel`n")
+                $dataBlobN++
+            } else {
+                Write-TrivialStub $rel $out
+            }
+            # Record hash so we skip next run
+            [System.IO.File]::AppendAllText($hashDbPath, "$sha`t$rel`n")
+            $skipTrivialN++
+            continue
+        }
     }
 
     $queue.Add($rel)
@@ -1363,6 +1405,7 @@ $linesStatus = if ($maxFileLines -gt 0) { "$maxFileLines lines max" } else { 'un
 Write-Host "Headers:         $hdrStatus  |  Max lines: $linesStatus"
 $skipDetail = "unchanged=$skipUnchanged"
 if ($skipTrivialN -gt 0)    { $skipDetail += "  trivial=$skipTrivialN" }
+if ($dataBlobN -gt 0)       { $skipDetail += "  data-blob=$dataBlobN" }
 if ($skipBatched  -gt 0)    { $skipDetail += "  batched=$skipBatched" }
 if ($skipPatternCached -gt 0) { $skipDetail += "  pattern=$skipPatternCached" }
 if ($skipClassified -gt 0)   { $skipDetail += "  classified=$skipClassified" }
@@ -1790,4 +1833,7 @@ if (Test-Path $hashDbPath) {
     ($keep | Sort-Object) -join "`n" | Set-Content $hashDbPath -Encoding UTF8
 }
 
+if ($dataBlobN -gt 0) {
+    Write-Host "Data-blob detector: skipped $dataBlobN generated data-table file(s) (stubbed, not sent to the LLM). See $dataBlobLedger" -ForegroundColor Cyan
+}
 Write-Host "Done. Per-file docs are in: $archDir" -ForegroundColor Green
