@@ -59,6 +59,8 @@ Useful options:
 # -SkipSerena if LSP context already extracted; -SkipPass2 to stop after the overview
 ```
 
+On the ollama backend it runs a **pre-flight GPU load** (POSTs the model to the gateway's `/api/load` so Ollama owns the card before the run; `-SkipLoad` to skip). If **`NOTIFY_URL`** is set in `.env` (an ntfy topic URL or any plain-text webhook), it POSTs a **push notification at each section** — pipeline start, every stage (OK/FAILED), and complete — each prefixed with the target name. **`run_batch.ps1`** runs the pipeline across several targets back-to-back (`-Targets a, b, c`), preserving each run's report as `architecture/Run Report - <name>.md` and continuing past a failed subsystem; collect + status updates stay manual, one subsystem at a time.
+
 ## Outputs
 
 Everything lands under `architecture/` (excluded from analysis):

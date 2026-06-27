@@ -65,6 +65,19 @@ function Get-EnvVal($key) {
     return ''
 }
 
+# Best-effort push notification per pipeline section. Reads NOTIFY_URL from .env
+# (an ntfy topic URL or any webhook that accepts a plain-text POST body). Empty =
+# disabled. ntfy reads the body as the message and Title/Priority/Tags as headers.
+# Never throws -- a notification failure must not break the pipeline.
+function Send-Notification($Title, $Message, $Priority = 'default', $Tags = '') {
+    if (-not $script:notifyUrl) { return }
+    try {
+        $h = @{ Title = $Title; Priority = $Priority }
+        if ($Tags) { $h['Tags'] = $Tags }
+        Invoke-RestMethod -Uri $script:notifyUrl -Method Post -Body $Message -Headers $h -ContentType 'text/plain; charset=utf-8' -TimeoutSec 10 | Out-Null
+    } catch { Write-Host "  (notify failed: $($_.Exception.Message))" -ForegroundColor DarkYellow }
+}
+
 function Format-Duration([TimeSpan]$ts) {
     if ($ts.TotalHours -ge 1)        { '{0}h{1:d2}m{2:d2}s' -f [int][math]::Floor($ts.TotalHours), $ts.Minutes, $ts.Seconds }
     elseif ($ts.TotalMinutes -ge 1)  { '{0}m{1:d2}s' -f $ts.Minutes, $ts.Seconds }
@@ -225,11 +238,13 @@ function Invoke-Stage($Name, $ScriptName, $Params, $Kind, $StateDir) {
 
     if ($isFail) {
         Write-Host "STAGE FAILED: $Name (exit=$code, file-failures=$($fails.Count))" -ForegroundColor Red
+        Send-Notification "$script:notifyPrefix FAILED: $Name" "exit=$code, file-failures=$($fails.Count)$(if($note){" -- $note"})" 'high' 'rotating_light'
         Write-RunReport "FAILED at stage: $Name"
         Write-Host "Run report: $ReportPath" -ForegroundColor Yellow
         exit 1
     }
     Write-Host ("STAGE OK: {0}  ({1})" -f $Name, (Format-Duration $dur)) -ForegroundColor Green
+    Send-Notification "$script:notifyPrefix OK: $Name" "done in $(Format-Duration $dur)$(if($counts){" (done=$($counts.done) fail=$($counts.fail) skip=$($counts.skip))"})" 'low' 'white_check_mark'
 }
 
 # --- resolve backend ----------------------------------------------
@@ -237,6 +252,11 @@ function Invoke-Stage($Name, $ScriptName, $Params, $Kind, $StateDir) {
 $script:backend = Get-EnvVal 'LLM_BACKEND'; if (-not $script:backend) { $script:backend = 'ollama' }
 $script:model   = if ($script:backend -eq 'claude') { Get-EnvVal 'CLAUDE_MODEL' } else { Get-EnvVal 'LLM_DEFAULT_MODEL' }
 if (-not $script:model) { $script:model = '(default)' }
+
+# Per-section push notifications (best-effort; disabled when NOTIFY_URL is unset).
+# Prefix each with the target leaf so batched runs are distinguishable on the phone.
+$script:notifyUrl    = Get-EnvVal 'NOTIFY_URL'
+$script:notifyPrefix = "[$(Split-Path $TargetDir -Leaf)]"
 
 # Pre-flight: arbitrate the GPU for Ollama. The ollama backend hits raw Ollama
 # (:11434) directly, bypassing the gateway's GPU arbitration, so we POST the model
@@ -280,6 +300,9 @@ Write-Host "============================================" -ForegroundColor Yello
 Write-Host "Backend / model: $script:backend / $script:model"
 Write-Host "Target:          $TargetDir"
 Write-Host "Report:          $ReportPath"
+if ($script:notifyUrl) { Write-Host "Notify:          $script:notifyUrl" }
+
+Send-Notification "$script:notifyPrefix pipeline started" "backend=$script:backend model=$script:model target=$TargetDir" 'low' 'rocket'
 
 if ($script:backend -eq 'ollama' -and -not $SkipLoad) { Invoke-ModelPreload $script:model }
 
@@ -321,5 +344,6 @@ if (-not $SkipPass2) {
 }
 
 Write-RunReport 'SUCCESS - all stages completed'
+Send-Notification "$script:notifyPrefix pipeline COMPLETE" "all stages OK in $(Format-Duration ((Get-Date) - $script:runStart))" 'default' 'tada'
 Write-Host ""
 Write-Host "Pipeline complete. Run report: $ReportPath" -ForegroundColor Green
