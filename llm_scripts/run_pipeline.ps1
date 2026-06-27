@@ -140,17 +140,30 @@ function Write-RunReport($Overall) {
         }
     }
 
-    $blobLines = @()
-    foreach ($d in @($archState, $pass2St)) {
-        $led = Join-Path $d 'datablob.tsv'
-        if (Test-Path $led) { $blobLines += @(Get-Content $led -ErrorAction SilentlyContinue) }
+    # Count data-blob skips from the stub docs ON DISK (authoritative across resumes),
+    # not the per-run ledger -- a stub carries this marker, and a blob may have both a
+    # <path>.md and <path>.pass2.md stub, so dedupe to unique source files.
+    $blobMarker = 'skipped by the data-blob detector'
+    $blobSet = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($d in $allMd) {
+        if (Select-String -LiteralPath $d.FullName -Pattern $blobMarker -SimpleMatch -Quiet) {
+            $rel = $d.FullName.Substring($archDir.Length).TrimStart('\','/') -replace '\\','/'
+            $rel = $rel -replace '\.pass2\.md$','' -replace '\.md$',''
+            # Exclude overview/diagram artifacts that merely QUOTE the stub text (the
+            # synthesis ingests stub docs): a real stub maps back to an actual source
+            # file; "Renderer diagram_data" and the like do not.
+            if (Test-Path -LiteralPath (Join-Path $repoRoot ($rel -replace '/','\')) -PathType Leaf) {
+                [void]$blobSet.Add($rel)
+            }
+        }
     }
-    $blobs = @($blobLines | Where-Object { $_ -ne '' } | Sort-Object -Unique)
+    $blobs = @($blobSet | Sort-Object)
     $o += ""
     $o += "## Data-blob skips"
     $o += ""
-    $o += "Generated data-table files (giant literal arrays / LUTs) detected and stubbed by the"
-    $o += "data-blob detector (Pass 1 + Pass 2) instead of being sent to the LLM: **$($blobs.Count)**."
+    $o += "Generated data-table files (giant literal arrays / LUTs) stubbed by the data-blob detector"
+    $o += "instead of being sent to the LLM -- counted from the stub docs on disk under the target scope"
+    $o += "(unique source files, deduping Pass 1 + Pass 2 stubs): **$($blobs.Count)**."
     if ($blobs.Count -gt 0) {
         $o += ""
         foreach ($b in $blobs) { $o += "- ``$b``" }
@@ -252,9 +265,10 @@ function Invoke-ModelPreload($Model) {
 $archState = Join-Path $archDir '.archgen_state'
 $pass2St   = Join-Path $archDir '.pass2_state'
 
-# Clear the data-blob ledgers (Pass 1 + Pass 2) so the report reflects only this
-# run (the stages append to them; the orchestrator owns their lifecycle, like
-# failures.tsv).
+# Clear the data-blob ledgers (Pass 1 + Pass 2) at run start so each stage's
+# console summary ("skipped N ... See datablob.tsv") is scoped to THIS run. The
+# Run Report counts the stub docs on disk instead (authoritative across resumes),
+# so it does not depend on these ledgers.
 foreach ($d in @($archState, $pass2St)) {
     $led = Join-Path $d 'datablob.tsv'
     if (Test-Path $led) { Remove-Item $led -Force -ErrorAction SilentlyContinue }
