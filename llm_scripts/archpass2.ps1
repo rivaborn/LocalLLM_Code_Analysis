@@ -430,6 +430,19 @@ $outputFmt     = Cfg $cfg 'CLAUDE_OUTPUT_FORMAT' 'text'
 $jobCount      = if ($Jobs -gt 0) { $Jobs } else { [int](Cfg $cfg 'JOBS' '2') }
 $maxRetries    = [int](Cfg $cfg 'MAX_RETRIES' '2')
 $retryDelay    = [int](Cfg $cfg 'RETRY_DELAY' '5')
+# Progress heartbeat (mirrors archgen.ps1): POST the current PROGRESS line to
+# NOTIFY_URL every NOTIFY_PROGRESS_INTERVAL seconds (default 900 = 15 min).
+# Opt-in (empty URL = off).
+$notifyUrl      = Cfg $cfg 'NOTIFY_URL' ''
+$notifyInterval = [int](Cfg $cfg 'NOTIFY_PROGRESS_INTERVAL' '900')
+$notifyPrefix   = "[$(Split-Path $TargetDir -Leaf)]"
+$script:notifyLastBeat = [datetime]::Now
+function Invoke-ProgressBeat($line) {
+    if (-not $notifyUrl) { return }
+    if (([datetime]::Now - $script:notifyLastBeat).TotalSeconds -lt $notifyInterval) { return }
+    $script:notifyLastBeat = [datetime]::Now
+    try { Invoke-RestMethod -Uri $notifyUrl -Method Post -Body $line -Headers @{ Title = "$notifyPrefix Pass 2 progress" } -ContentType 'text/plain; charset=utf-8' -TimeoutSec 10 | Out-Null } catch {}
+}
 $includeRx     = Cfg $cfg 'INCLUDE_EXT_REGEX' '\.(c|cc|cpp|cxx|h|hh|hpp|inl|inc|cs|java|py|rs|lua|gd|m|mm|swift)$'
 $excludeRx     = Cfg $cfg 'EXCLUDE_DIRS_REGEX' '[/\\](\.git|architecture|build|out|dist|obj|bin)([/\\]|$)'
 $extraExclude  = Cfg $cfg 'EXTRA_EXCLUDE_REGEX' ''
@@ -839,6 +852,7 @@ foreach ($rel in $queue) {
                 } else { $modelStatus = "model=$llmModel" }
                 $line    = "PROGRESS: $($c.done)/$toDo  skip=$($c.skip)  fail=$($c.fail)  retries=$($c.retries)  rate=${rate}/s  eta=$eta  $modelStatus$rlStatus"
                 Write-Host "`r$line    " -NoNewline
+                Invoke-ProgressBeat $line
             }
             Start-Sleep -Milliseconds 500
         }
@@ -886,6 +900,7 @@ while ($running.Count -gt 0) {
             } else { $modelStatus = "model=$llmModel" }
             $line    = "PROGRESS: $($c.done)/$toDo  skip=$($c.skip)  fail=$($c.fail)  retries=$($c.retries)  rate=${rate}/s  eta=${eta}s  $modelStatus$rlStatus"
             Write-Host "`r$line    " -NoNewline
+            Invoke-ProgressBeat $line
         }
         Start-Sleep -Milliseconds 500
     }

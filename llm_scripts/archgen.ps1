@@ -147,6 +147,12 @@ $outputFmt    = Cfg 'CLAUDE_OUTPUT_FORMAT' 'text'
 $jobCount     = if ($Jobs -gt 0) { $Jobs } else { [int](Cfg 'JOBS' '2') }
 $maxRetries   = [int](Cfg 'MAX_RETRIES'    '2')
 $retryDelay   = [int](Cfg 'RETRY_DELAY'    '5')
+# Progress heartbeat: POST the current PROGRESS line to NOTIFY_URL every
+# NOTIFY_PROGRESS_INTERVAL seconds (default 900 = 15 min). Opt-in (empty URL = off).
+$notifyUrl      = Cfg 'NOTIFY_URL' ''
+$notifyInterval = [int](Cfg 'NOTIFY_PROGRESS_INTERVAL' '900')
+$notifyPrefix   = "[$(Split-Path $TargetDir -Leaf)]"
+$script:notifyLastBeat = [datetime]::Now
 $bundleHdrs   = if ($NoHeaders) { '0' } else { Cfg 'BUNDLE_HEADERS' '1' }
 $maxBundled   = [int](Cfg 'MAX_BUNDLED_HEADERS' '5')
 $maxFileLines = [int](Cfg 'MAX_FILE_LINES' '4000')
@@ -1511,6 +1517,10 @@ function Show-Progress {
         }
         $line = "PROGRESS: $done/$toDo  skip=$($script:progressSkip)  fail=$fail  retries=$retries  rate=${rate}/s  eta=$eta  $modelStatus$rlStatus"
         [Console]::Write("`r" + $line.PadRight(100))
+        if ($notifyUrl -and (([datetime]::Now - $script:notifyLastBeat).TotalSeconds -ge $notifyInterval)) {
+            $script:notifyLastBeat = [datetime]::Now
+            try { Invoke-RestMethod -Uri $notifyUrl -Method Post -Body $line -Headers @{ Title = "$notifyPrefix Pass 1 progress" } -ContentType 'text/plain; charset=utf-8' -TimeoutSec 10 | Out-Null } catch {}
+        }
     } catch {
         # Progress is a best-effort, repeating display tick -- a transient file-lock or
         # parse hiccup just skips this repaint (the next tick recovers). Never smear an

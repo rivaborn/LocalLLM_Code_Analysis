@@ -37,6 +37,37 @@ $pipeline   = Join-Path $toolkitDir 'run_pipeline.ps1'
 if (-not (Test-Path $pipeline)) { Write-Host "run_pipeline.ps1 not found at $pipeline" -ForegroundColor Red; exit 1 }
 New-Item -ItemType Directory -Force -Path $archDir | Out-Null
 
+function Get-EnvVal($key) {
+    if (-not (Test-Path $EnvFile)) { return '' }
+    foreach ($line in Get-Content $EnvFile) {
+        $t = $line.Trim()
+        if ($t -match '^\s*#' -or $t -eq '') { continue }
+        if ($t -match ('^' + [regex]::Escape($key) + '\s*=\s*(.*)$')) { return $Matches[1].Trim().Trim('"').Trim("'") }
+    }
+    return ''
+}
+
+function Format-Hours($minutes) {
+    if ($minutes -ge 60) { '{0:0.0}h' -f ($minutes / 60.0) } else { '{0}m' -f [int][math]::Round($minutes) }
+}
+
+# Same include/exclude filters the stages use -- drives the pre-run ETA estimate.
+function Get-AnalyzableFileCount($Target) {
+    $root = if ($Target -ne '.' -and $Target -ne 'all') { Join-Path $repoRoot $Target } else { $repoRoot }
+    if (-not (Test-Path $root)) { return 0 }
+    $incRx = Get-EnvVal 'INCLUDE_EXT_REGEX'; if (-not $incRx) { $incRx = '\.(cpp|h|hpp|cc|cxx|inl|cs)$' }
+    $excRx = Get-EnvVal 'EXCLUDE_DIRS_REGEX'
+    $n = 0
+    try {
+        foreach ($f in [System.IO.Directory]::EnumerateFiles($root, '*', [System.IO.SearchOption]::AllDirectories)) {
+            if ($f -notmatch $incRx) { continue }
+            if ($excRx) { $rel = $f.Substring($repoRoot.Length).TrimStart('\','/') -replace '\\','/'; if ($rel -match $excRx) { continue } }
+            $n++
+        }
+    } catch {}
+    return $n
+}
+
 function Fmt([TimeSpan]$ts) {
     if ($ts.TotalHours -ge 1)       { '{0}h{1:d2}m{2:d2}s' -f [int][math]::Floor($ts.TotalHours), $ts.Minutes, $ts.Seconds }
     elseif ($ts.TotalMinutes -ge 1) { '{0}m{1:d2}s' -f $ts.Minutes, $ts.Seconds }
@@ -47,6 +78,28 @@ Write-Host "============================================" -ForegroundColor Yello
 Write-Host "  run_batch.ps1 - $($Targets.Count) systems" -ForegroundColor Yellow
 Write-Host "============================================" -ForegroundColor Yellow
 foreach ($t in $Targets) { Write-Host "  - $t" }
+
+# --- Pre-run ETA estimate (whole run + per subsystem) -------------
+$r = Get-EnvVal 'ETA_MIN_PER_FILE'; $etaRate = if ($r) { [double]$r } else { 3.3 }
+$etaRows  = @()
+$totalMin = 0
+foreach ($t in $Targets) {
+    $n = Get-AnalyzableFileCount $t
+    $m = $n * $etaRate
+    $totalMin += $m
+    $etaRows += [pscustomobject]@{ Name = (Split-Path $t -Leaf); Files = $n; Min = $m }
+}
+Write-Host ""
+Write-Host "Estimated run (@ $etaRate min/file):" -ForegroundColor Yellow
+foreach ($e in $etaRows) { Write-Host ("  {0,-26} {1,5} files  ~{2}" -f $e.Name, $e.Files, (Format-Hours $e.Min)) }
+Write-Host ("  {0,-26} {1,5}        ~{2}  TOTAL" -f '', '', (Format-Hours $totalMin)) -ForegroundColor Yellow
+
+$notifyUrl = Get-EnvVal 'NOTIFY_URL'
+if ($notifyUrl) {
+    $msg = "Batch starting: $($Targets.Count) systems, est ~$(Format-Hours $totalMin) total`n" +
+           (($etaRows | ForEach-Object { "$($_.Name): ~$(Format-Hours $_.Min) ($($_.Files) files)" }) -join "`n")
+    try { Invoke-RestMethod -Uri $notifyUrl -Method Post -Body $msg -Headers @{ Title = "batch starting ($($Targets.Count) systems)"; Tags = 'calendar' } -ContentType 'text/plain; charset=utf-8' -TimeoutSec 10 | Out-Null } catch {}
+}
 
 $batchStart = Get-Date
 $results = New-Object System.Collections.Generic.List[object]

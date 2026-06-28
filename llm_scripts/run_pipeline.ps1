@@ -84,6 +84,30 @@ function Format-Duration([TimeSpan]$ts) {
     else                             { '{0}s' -f [int]$ts.TotalSeconds }
 }
 
+function Format-Hours($minutes) {
+    if ($minutes -ge 60) { '{0:0.0}h' -f ($minutes / 60.0) } else { '{0}m' -f [int][math]::Round($minutes) }
+}
+
+# Rough analyzable-file count under a target (same include/exclude filters the
+# stages use) -- drives the pre-run ETA estimate. Counts all matching source files;
+# the per-file rate (ETA_MIN_PER_FILE, default 3.3) already folds in trivial-skip
+# and free-stage overhead (basis: NavigationSystem 106 files / 5h26m = 3.1 min/file).
+function Get-AnalyzableFileCount($Target) {
+    $root = if ($Target -ne '.' -and $Target -ne 'all') { Join-Path $repoRoot $Target } else { $repoRoot }
+    if (-not (Test-Path $root)) { return 0 }
+    $incRx = Get-EnvVal 'INCLUDE_EXT_REGEX'; if (-not $incRx) { $incRx = '\.(cpp|h|hpp|cc|cxx|inl|cs)$' }
+    $excRx = Get-EnvVal 'EXCLUDE_DIRS_REGEX'
+    $n = 0
+    try {
+        foreach ($f in [System.IO.Directory]::EnumerateFiles($root, '*', [System.IO.SearchOption]::AllDirectories)) {
+            if ($f -notmatch $incRx) { continue }
+            if ($excRx) { $rel = $f.Substring($repoRoot.Length).TrimStart('\','/') -replace '\\','/'; if ($rel -match $excRx) { continue } }
+            $n++
+        }
+    } catch {}
+    return $n
+}
+
 function Format-MdTable($headers, $rows) {
     $cols = $headers.Count
     $w = New-Object 'int[]' $cols
@@ -257,6 +281,7 @@ if (-not $script:model) { $script:model = '(default)' }
 # Prefix each with the target leaf so batched runs are distinguishable on the phone.
 $script:notifyUrl    = Get-EnvVal 'NOTIFY_URL'
 $script:notifyPrefix = "[$(Split-Path $TargetDir -Leaf)]"
+$r = Get-EnvVal 'ETA_MIN_PER_FILE'; $script:etaRate = if ($r) { [double]$r } else { 3.3 }
 
 # Pre-flight: arbitrate the GPU for Ollama. The ollama backend hits raw Ollama
 # (:11434) directly, bypassing the gateway's GPU arbitration, so we POST the model
@@ -297,12 +322,15 @@ foreach ($d in @($archState, $pass2St)) {
 Write-Host "============================================" -ForegroundColor Yellow
 Write-Host "  run_pipeline.ps1 - full pipeline" -ForegroundColor Yellow
 Write-Host "============================================" -ForegroundColor Yellow
+$script:etaFiles = Get-AnalyzableFileCount $TargetDir
+$script:etaStr   = Format-Hours ($script:etaFiles * $script:etaRate)
 Write-Host "Backend / model: $script:backend / $script:model"
 Write-Host "Target:          $TargetDir"
+Write-Host "Est. run:        ~$script:etaStr  ($script:etaFiles files @ $script:etaRate min/file)"
 Write-Host "Report:          $ReportPath"
 if ($script:notifyUrl) { Write-Host "Notify:          $script:notifyUrl" }
 
-Send-Notification "$script:notifyPrefix pipeline started" "backend=$script:backend model=$script:model target=$TargetDir" 'low' 'rocket'
+Send-Notification "$script:notifyPrefix pipeline started" "backend=$script:backend model=$script:model target=$TargetDir`nEst. run ~$script:etaStr ($script:etaFiles files @ $script:etaRate min/file)" 'low' 'rocket'
 
 if ($script:backend -eq 'ollama' -and -not $SkipLoad) { Invoke-ModelPreload $script:model }
 
