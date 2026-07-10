@@ -10,7 +10,7 @@
     "rootUri": "repo_root",
     "workspaceFolders": true,
     "initializationOptions": {},
-    "warmup": { "strategy": "poll_symbols", "timeoutSeconds": 120 },
+    "warmup": { "strategy": "poll_symbols", "timeoutSeconds": 120, "settleSeconds": 20 },
     "processNames": ["lua-language-server.exe", "lua-language-server"],
     "ramPerWorkerGb": 1.5,
     "restartInterval": 2000,

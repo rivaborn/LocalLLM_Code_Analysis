@@ -647,9 +647,15 @@ def extract_file(client, file_path, repo_root, skip_refs=False, compress=False, 
                 external_refs = []
                 for ref in refs:
                     ref_uri = ref.get("uri", "")
-                    if ref_uri == uri:
-                        continue  # Skip self-references
                     ref_rel = uri_to_relpath(ref_uri, repo_root)
+                    # Skip self-references. Compare normalized relative paths,
+                    # not raw URIs - some servers (lua-language-server) return
+                    # URIs with different drive-letter case/percent-encoding
+                    # than the one we sent in didOpen, which used to let
+                    # same-file references flood the section and crowd out the
+                    # cross-file ones under MAX_REFS_PER_SYMBOL.
+                    if os.path.normcase(ref_rel) == os.path.normcase(rel):
+                        continue
                     ref_line = ref.get("range", {}).get("start", {}).get("line", 0) + 1
                     external_refs.append(f"{ref_rel}:{ref_line}")
 
