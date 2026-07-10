@@ -97,7 +97,9 @@ function Receive-LiveJobOutput {
     $cj = if ($Job.ChildJobs.Count -gt 0) { $Job.ChildJobs[0] } else { $Job }
     $total = $cj.Output.Count + $cj.Information.Count + $cj.Error.Count +
              $cj.Warning.Count + $cj.Verbose.Count
-    if ($null -eq $script:liveJobSeen) { $script:liveJobSeen = @{} }
+    # Test-Path, not a $null compare: the parents run Set-StrictMode Latest,
+    # where reading a never-assigned variable is a terminating error.
+    if (-not (Test-Path variable:script:liveJobSeen)) { $script:liveJobSeen = @{} }
     $seen = $script:liveJobSeen[$Job.Id]
     if ($null -eq $seen) { $seen = 0 }
     if ($total -gt $seen) {
