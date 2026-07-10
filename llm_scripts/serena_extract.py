@@ -891,8 +891,11 @@ class ExtractionWorker:
         self.files_since_restart = 0
 
     def start(self):
-        self.client = LspClient(self.profile, self.server_path, self.repo_root, jobs=self.jobs)
-        self.client.warmup(self.warmup_sample)
+        # Server launch + warmup happen inside the worker thread so multiple
+        # workers warm up in PARALLEL - with poll_symbols servers that scan
+        # the whole workspace on startup (lua-language-server: tens of
+        # seconds), serial warmup used to cost workers x scan-time before
+        # the first file was processed.
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
 
@@ -935,6 +938,13 @@ class ExtractionWorker:
             return False
 
     def _run(self):
+        try:
+            self.client = LspClient(self.profile, self.server_path, self.repo_root, jobs=self.jobs)
+            self.client.warmup(self.warmup_sample)
+        except Exception as e:
+            with self.result_lock:
+                self._log_error("<startup>", "FAIL", f"language server startup failed: {e}")
+            return
         while not self.stop_event.is_set():
             try:
                 rel = self.work_queue.get(timeout=1)
