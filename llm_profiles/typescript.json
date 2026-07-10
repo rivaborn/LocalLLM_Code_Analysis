@@ -1,0 +1,50 @@
+{
+  "_doc": "TypeScript/JavaScript via typescript-language-server (node: `npm install -g typescript-language-server typescript`). On Windows the entry point is a .cmd shim - the extractor resolves it via shutil.which().",
+  "profile": "typescript",
+  "displayName": "TypeScript/JavaScript (typescript-language-server)",
+  "server": {
+    "command": ["typescript-language-server", "--stdio"],
+    "args": [],
+    "languageId": "typescript",
+    "languageIdByExt": {
+      ".js": "javascript",
+      ".jsx": "javascriptreact",
+      ".tsx": "typescriptreact"
+    },
+    "rootUri": "repo_root",
+    "workspaceFolders": true,
+    "initializationOptions": {},
+    "warmup": { "strategy": "poll_symbols", "timeoutSeconds": 90 },
+    "processNames": ["node.exe", "node"],
+    "ramPerWorkerGb": 2.0,
+    "restartInterval": 2000,
+    "needsCompileDb": false,
+    "prereqs": [
+      {
+        "type": "file",
+        "path": "tsconfig.json",
+        "severity": "warn",
+        "hint": "No tsconfig.json at the repo root; the server falls back to an inferred project (cross-file references may be weaker)."
+      }
+    ],
+    "cleanup": null
+  },
+  "extraction": {
+    "includeRegex": "\\.(ts|tsx|js|jsx|mts|cts)$",
+    "excludeRegex": "(^|[/\\\\])(\\.git|architecture|node_modules|dist|build|out|coverage)([/\\\\]|$)",
+    "depScan": ["^\\s*import\\s+.*?from\\s+[\"']([^\"']+)[\"']", "^\\s*import\\s+[\"']([^\"']+)[\"']", "require\\s*\\(\\s*[\"']([^\"']+)[\"']"],
+    "depSectionTitle": "Direct Import Dependencies",
+    "commentPrefix": "//",
+    "fence": "typescript"
+  },
+  "docgen": {
+    "codebaseDescDefault": "TypeScript/JavaScript codebase",
+    "trivialPatterns": ["\\.d\\.ts$", "\\.min\\.js$"],
+    "trivialIncludesOnly": false,
+    "trivialIncludesOnlyRegex": "",
+    "importBundling": null,
+    "inheritanceRegex": null,
+    "blobCommentPrefixes": "^(//|/\\*|\\*|\\*/)",
+    "promptOverrides": {}
+  }
+}

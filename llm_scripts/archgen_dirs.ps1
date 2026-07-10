@@ -309,8 +309,20 @@ $highModel  = Cfg 'HIGH_COMPLEXITY_MODEL' 'sonnet'
 if ($tieredModel -eq '1') { $model = $highModel }
 $maxTurns   = Cfg 'CLAUDE_MAX_TURNS' '1'
 $outputFmt  = Cfg 'CLAUDE_OUTPUT_FORMAT' 'text'
-$includeRx  = Cfg 'INCLUDE_EXT_REGEX' '\.(cpp|h|hpp|cc|cxx|inl|cs)$'
-$excludeRx  = Cfg 'EXCLUDE_DIRS_REGEX' '[/\\](\.git|architecture|Binaries|Build|DerivedDataCache|Intermediate|Saved|\.vs|ThirdParty|GeneratedFiles|AutomationTool)([/\\]|$)'
+# Preset-aware regex defaults (shared preset_core.ps1). Bare runs keep the
+# legacy hardcoded UE defaults so existing behavior is unchanged; a -Preset
+# (or .env PRESET) now actually selects that preset's regexes here.
+. (Join-Path $PSScriptRoot 'preset_core.ps1')
+$presetName = if ($Preset -ne '') { $Preset } else { Cfg 'PRESET' '' }
+$dirDefaultInclude = '\.(cpp|h|hpp|cc|cxx|inl|cs)$'
+$dirDefaultExclude = '[/\\](\.git|architecture|Binaries|Build|DerivedDataCache|Intermediate|Saved|\.vs|ThirdParty|GeneratedFiles|AutomationTool)([/\\]|$)'
+if ($presetName -ne '') {
+    $presetData = Get-Preset $presetName
+    $dirDefaultInclude = $presetData.Include
+    $dirDefaultExclude = $presetData.Exclude
+}
+$includeRx  = Cfg 'INCLUDE_EXT_REGEX' $dirDefaultInclude
+$excludeRx  = Cfg 'EXCLUDE_DIRS_REGEX' $dirDefaultExclude
 
 # -- Local LLM backend (LLMConfig) -----------------------------
 . (Join-Path $PSScriptRoot 'llm_core.ps1')

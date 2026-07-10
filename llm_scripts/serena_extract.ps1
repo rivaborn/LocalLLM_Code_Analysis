@@ -65,32 +65,10 @@ function Cfg($key, $default = '') {
     return $default
 }
 
-function Get-Preset($name) {
-    switch ($name.ToLower()) {
-        { $_ -in @('quake','quake2','quake3','doom','idtech') } {
-            return @{
-                Include = '\.(c|cc|cpp|cxx|h|hh|hpp|inl|inc)$'
-                Exclude = '[/\\](\.git|architecture|build|out|dist|obj|bin|Debug|Release|x64|Win32|\.vs|\.vscode|baseq2|baseq3|base)([/\\]|$)'
-            }
-        }
-        { $_ -in @('unreal','ue4','ue5') } {
-            return @{
-                Include = '\.(cpp|h|hpp|cc|cxx|inl)$'
-                Exclude = '[/\\](\.git|architecture|Binaries|Build|DerivedDataCache|Intermediate|Saved|\.vs|ThirdParty|GeneratedFiles|AutomationTool)([/\\]|$)'
-            }
-        }
-        '' {
-            return @{
-                Include = '\.(c|cc|cpp|cxx|h|hh|hpp|inl|inc)$'
-                Exclude = '[/\\](\.git|architecture|build|out|dist|obj|bin|Debug|Release|\.vs)([/\\]|$)'
-            }
-        }
-        default {
-            Write-Err "Unknown preset: $name"
-            exit 2
-        }
-    }
-}
+# Presets + language profiles live in the shared module (single source of
+# truth, also consumed by archgen.ps1 and friends). This script uses the
+# extraction-side fields: LspInclude / LspExclude.
+. (Join-Path $PSScriptRoot 'preset_core.ps1')
 
 function Build-PyArgs(
     $extractScript, $repoRoot, $targetDir, $clangdPath,
@@ -199,36 +177,57 @@ if ($Test) {
         # --------------------------------------------------
         Write-Host "--- Get-Preset ---" -ForegroundColor Yellow
 
-        # unreal preset
+        # unreal preset (extraction fields: LspInclude / LspExclude)
         $p = Get-Preset 'unreal'
-        Assert-True ('Engine/Source/Runtime/Core/Private/Foo.cpp' -match $p.Include) 'Get-Preset unreal: .cpp matches include'
-        Assert-True ('Engine/Source/Runtime/Core/Public/Bar.h' -match $p.Include) 'Get-Preset unreal: .h matches include'
-        Assert-False ('Engine/Source/Programs/Foo.cs' -match $p.Include) 'Get-Preset unreal: .cs does NOT match include'
-        Assert-True ('Engine/Source/ThirdParty/Lib/foo.cpp' -match $p.Exclude) 'Get-Preset unreal: ThirdParty matches exclude'
-        Assert-True ('Engine/Intermediate/Build/foo.cpp' -match $p.Exclude) 'Get-Preset unreal: Intermediate matches exclude'
-        Assert-True ('repo/.git/config' -match $p.Exclude) 'Get-Preset unreal: .git matches exclude'
-        Assert-True ('Engine/Source/Runtime/Core/Foo.inl' -match $p.Include) 'Get-Preset unreal: .inl matches include'
+        Assert-True ('Engine/Source/Runtime/Core/Private/Foo.cpp' -match $p.LspInclude) 'Get-Preset unreal: .cpp matches lsp include'
+        Assert-True ('Engine/Source/Runtime/Core/Public/Bar.h' -match $p.LspInclude) 'Get-Preset unreal: .h matches lsp include'
+        Assert-False ('Engine/Source/Programs/Foo.cs' -match $p.LspInclude) 'Get-Preset unreal: .cs does NOT match lsp include'
+        Assert-True ('Engine/Source/Programs/Foo.cs' -match $p.Include) 'Get-Preset unreal: .cs DOES match doc-gen include'
+        Assert-True ('Engine/Source/ThirdParty/Lib/foo.cpp' -match $p.LspExclude) 'Get-Preset unreal: ThirdParty matches exclude'
+        Assert-True ('Engine/Intermediate/Build/foo.cpp' -match $p.LspExclude) 'Get-Preset unreal: Intermediate matches exclude'
+        Assert-True ('repo/.git/config' -match $p.LspExclude) 'Get-Preset unreal: .git matches exclude'
+        Assert-True ('Engine/Source/Runtime/Core/Foo.inl' -match $p.LspInclude) 'Get-Preset unreal: .inl matches lsp include'
+        Assert-Equal $p.Profile 'cpp' 'Get-Preset unreal: profile is cpp'
 
         # ue5 alias
         $p5 = Get-Preset 'ue5'
-        Assert-Equal $p5.Include $p.Include 'Get-Preset: ue5 alias equals unreal include'
-        Assert-Equal $p5.Exclude $p.Exclude 'Get-Preset: ue5 alias equals unreal exclude'
+        Assert-Equal $p5.LspInclude $p.LspInclude 'Get-Preset: ue5 alias equals unreal lsp include'
+        Assert-Equal $p5.LspExclude $p.LspExclude 'Get-Preset: ue5 alias equals unreal lsp exclude'
 
         # quake preset
         $pq = Get-Preset 'quake'
-        Assert-True ('src/main.c' -match $pq.Include) 'Get-Preset quake: .c matches include'
-        Assert-True ('src/header.h' -match $pq.Include) 'Get-Preset quake: .h matches include'
-        Assert-False ('script.py' -match $pq.Include) 'Get-Preset quake: .py does NOT match include'
+        Assert-True ('src/main.c' -match $pq.LspInclude) 'Get-Preset quake: .c matches lsp include'
+        Assert-True ('src/header.h' -match $pq.LspInclude) 'Get-Preset quake: .h matches lsp include'
+        Assert-False ('script.py' -match $pq.LspInclude) 'Get-Preset quake: .py does NOT match lsp include'
 
         # empty preset (default)
         $pe = Get-Preset ''
-        Assert-True ('foo.cpp' -match $pe.Include) 'Get-Preset empty: .cpp matches include'
-        Assert-True ('foo.c' -match $pe.Include) 'Get-Preset empty: .c matches include'
-        Assert-True ('repo/.git/HEAD' -match $pe.Exclude) 'Get-Preset empty: .git matches exclude'
+        Assert-True ('foo.cpp' -match $pe.LspInclude) 'Get-Preset empty: .cpp matches lsp include'
+        Assert-True ('foo.c' -match $pe.LspInclude) 'Get-Preset empty: .c matches lsp include'
+        Assert-True ('repo/.git/HEAD' -match $pe.LspExclude) 'Get-Preset empty: .git matches exclude'
+        Assert-False ('foo.py' -match $pe.LspInclude) 'Get-Preset empty: .py does NOT match lsp include (clangd cannot parse it)'
+
+        # koreader / lua presets route to the lua profile
+        $pk = Get-Preset 'koreader'
+        Assert-True ('frontend/ui/uimanager.lua' -match $pk.LspInclude) 'Get-Preset koreader: .lua matches lsp include'
+        Assert-True ('base/thirdparty/foo.lua' -match $pk.LspExclude) 'Get-Preset koreader: base/ matches exclude'
+        Assert-True ('spec/unit/foo_spec.lua' -match $pk.LspExclude) 'Get-Preset koreader: spec/ matches exclude'
+        Assert-Equal $pk.Profile 'lua' 'Get-Preset koreader: profile is lua'
+
+        # language profiles load and resolve
+        $profCpp = Get-LangProfile 'cpp'
+        Assert-Equal $profCpp.server.languageId 'cpp' 'Get-LangProfile cpp: languageId'
+        Assert-Equal $profCpp.server.cleanup 'pch' 'Get-LangProfile cpp: pch cleanup'
+        $profLua = Get-LangProfile 'lua'
+        Assert-Equal $profLua.server.languageId 'lua' 'Get-LangProfile lua: languageId'
+        Assert-Equal $profLua.extraction.depSectionTitle 'Direct Require Dependencies' 'Get-LangProfile lua: dep section title'
+        Assert-Equal (Resolve-ProfileName $pk '') 'lua' 'Resolve-ProfileName: preset profile wins'
+        Assert-Equal (Resolve-ProfileName $pe 'go') 'go' 'Resolve-ProfileName: env fallback when preset has no profile'
+        Assert-Equal (Resolve-ProfileName $pe '') 'cpp' 'Resolve-ProfileName: cpp default'
 
         # exclude patterns match common dirs
         foreach ($dir in @('ThirdParty', 'Intermediate', '.git', 'architecture', 'Binaries')) {
-            Assert-True ("Engine/$dir/foo.cpp" -match $p.Exclude) "Get-Preset unreal: exclude matches $dir"
+            Assert-True ("Engine/$dir/foo.cpp" -match $p.LspExclude) "Get-Preset unreal: exclude matches $dir"
         }
 
         # --------------------------------------------------
@@ -311,8 +310,8 @@ if ($Test) {
 $cfg = Read-EnvFile $EnvFile
 $presetName = if ($Preset -ne '') { $Preset } else { Cfg 'PRESET' '' }
 $presetData = Get-Preset $presetName
-$includeRx  = Cfg 'INCLUDE_EXT_REGEX'  $presetData.Include
-$excludeRx  = Cfg 'EXCLUDE_DIRS_REGEX' $presetData.Exclude
+$includeRx  = Cfg 'INCLUDE_EXT_REGEX'  $presetData.LspInclude
+$excludeRx  = Cfg 'EXCLUDE_DIRS_REGEX' $presetData.LspExclude
 
 $repoRoot = (Get-Location).Path
 try {

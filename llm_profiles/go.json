@@ -1,0 +1,46 @@
+{
+  "_doc": "Go via gopls (`go install golang.org/x/tools/gopls@latest`). rootUri must be the module root (where go.mod lives). GOPATH/GOMODCACHE are inherited from the environment.",
+  "profile": "go",
+  "displayName": "Go (gopls)",
+  "server": {
+    "command": ["gopls"],
+    "args": [],
+    "languageId": "go",
+    "languageIdByExt": {},
+    "rootUri": "repo_root",
+    "workspaceFolders": true,
+    "initializationOptions": {},
+    "warmup": { "strategy": "poll_symbols", "timeoutSeconds": 90 },
+    "processNames": ["gopls.exe", "gopls"],
+    "ramPerWorkerGb": 2.0,
+    "restartInterval": 2000,
+    "needsCompileDb": false,
+    "prereqs": [
+      {
+        "type": "file",
+        "path": "go.mod",
+        "severity": "error",
+        "hint": "gopls needs a Go module root. Run from the directory containing go.mod (or create one with `go mod init`)."
+      }
+    ],
+    "cleanup": null
+  },
+  "extraction": {
+    "includeRegex": "\\.go$",
+    "excludeRegex": "(^|[/\\\\])(\\.git|architecture|vendor|testdata|node_modules)([/\\\\]|$)",
+    "depScan": ["^\\s*import\\s+(?:\\w+\\s+)?\"([^\"]+)\"", "^\\s*(?:\\w+\\s+)?\"([^\"]+)\"\\s*$"],
+    "depSectionTitle": "Direct Import Dependencies",
+    "commentPrefix": "//",
+    "fence": "go"
+  },
+  "docgen": {
+    "codebaseDescDefault": "Go codebase",
+    "trivialPatterns": ["\\.pb\\.go$", "_string\\.go$"],
+    "trivialIncludesOnly": false,
+    "trivialIncludesOnlyRegex": "",
+    "importBundling": null,
+    "inheritanceRegex": null,
+    "blobCommentPrefixes": "^(//|/\\*|\\*|\\*/)",
+    "promptOverrides": {}
+  }
+}

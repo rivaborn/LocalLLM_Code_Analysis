@@ -1,0 +1,39 @@
+{
+  "_doc": "Python via jedi-language-server (pure Python, no node: `uv tool install jedi-language-server`). Alternative: pyright - swap server.command to [\"pyright-langserver\", \"--stdio\"] (requires node; resolve the .cmd shim via PATH).",
+  "profile": "python",
+  "displayName": "Python (jedi-language-server)",
+  "server": {
+    "command": ["jedi-language-server"],
+    "args": [],
+    "languageId": "python",
+    "languageIdByExt": {},
+    "rootUri": "repo_root",
+    "workspaceFolders": true,
+    "initializationOptions": {},
+    "warmup": { "strategy": "poll_symbols", "timeoutSeconds": 60 },
+    "processNames": ["jedi-language-server.exe", "jedi-language-server", "python.exe", "python"],
+    "ramPerWorkerGb": 1.0,
+    "restartInterval": 2000,
+    "needsCompileDb": false,
+    "prereqs": [],
+    "cleanup": null
+  },
+  "extraction": {
+    "includeRegex": "\\.py$",
+    "excludeRegex": "(^|[/\\\\])(\\.git|architecture|__pycache__|\\.venv|venv|node_modules|build|dist|\\.mypy_cache|\\.pytest_cache)([/\\\\]|$)",
+    "depScan": ["^\\s*from\\s+([\\w.]+)\\s+import", "^\\s*import\\s+([\\w.]+)"],
+    "depSectionTitle": "Direct Import Dependencies",
+    "commentPrefix": "#",
+    "fence": "python"
+  },
+  "docgen": {
+    "codebaseDescDefault": "Python codebase",
+    "trivialPatterns": ["_pb2\\.py$", "_pb2_grpc\\.py$"],
+    "trivialIncludesOnly": false,
+    "trivialIncludesOnlyRegex": "",
+    "importBundling": null,
+    "inheritanceRegex": null,
+    "blobCommentPrefixes": "^(#)",
+    "promptOverrides": {}
+  }
+}

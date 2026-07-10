@@ -1,0 +1,46 @@
+{
+  "_doc": "Lua via lua-language-server (LuaLS). The server reads .luarc.json from the workspace root automatically (KOReader ships one). No compile database needed. Install: download a release from https://github.com/LuaLS/lua-language-server/releases and put its bin\\ on PATH, or pass -ServerPath.",
+  "profile": "lua",
+  "displayName": "Lua (lua-language-server)",
+  "server": {
+    "command": ["lua-language-server"],
+    "args": [],
+    "languageId": "lua",
+    "languageIdByExt": {},
+    "rootUri": "repo_root",
+    "workspaceFolders": true,
+    "initializationOptions": {},
+    "warmup": { "strategy": "poll_symbols", "timeoutSeconds": 120 },
+    "processNames": ["lua-language-server.exe", "lua-language-server"],
+    "ramPerWorkerGb": 1.5,
+    "restartInterval": 2000,
+    "needsCompileDb": false,
+    "prereqs": [
+      {
+        "type": "file",
+        "path": ".luarc.json",
+        "severity": "warn",
+        "hint": "No .luarc.json at the repo root; lua-language-server will use defaults (runtime version, globals). Recommended but not required."
+      }
+    ],
+    "cleanup": null
+  },
+  "extraction": {
+    "includeRegex": "\\.lua$",
+    "excludeRegex": "(^|[/\\\\])(\\.git|architecture|node_modules|build|dist|out)([/\\\\]|$)",
+    "depScan": ["require\\s*\\(?\\s*[\"']([^\"']+)[\"']"],
+    "depSectionTitle": "Direct Require Dependencies",
+    "commentPrefix": "--",
+    "fence": "lua"
+  },
+  "docgen": {
+    "codebaseDescDefault": "Lua application codebase",
+    "trivialPatterns": [],
+    "trivialIncludesOnly": false,
+    "trivialIncludesOnlyRegex": "",
+    "importBundling": null,
+    "inheritanceRegex": null,
+    "blobCommentPrefixes": "^(--)",
+    "promptOverrides": {}
+  }
+}

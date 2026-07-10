@@ -1,0 +1,52 @@
+{
+  "_doc": "C/C++ via clangd. This profile captures the toolkit's original hardcoded behavior EXACTLY - the golden gate (tests/run_golden_gate.ps1) asserts extraction output stays byte-identical. Do not tune values here without recapturing the golden.",
+  "profile": "cpp",
+  "displayName": "C/C++ (clangd)",
+  "server": {
+    "command": ["clangd"],
+    "args": ["--compile-commands-dir={repo_root}", "--background-index", "--pch-storage=disk", "-j={jobs}"],
+    "languageId": "cpp",
+    "languageIdByExt": {},
+    "rootUri": "none",
+    "workspaceFolders": false,
+    "initializationOptions": {},
+    "warmup": { "strategy": "sleep", "seconds": 3 },
+    "processNames": ["clangd.exe", "clangd"],
+    "ramPerWorkerGb": 5.0,
+    "restartInterval": 1000,
+    "needsCompileDb": true,
+    "prereqs": [
+      {
+        "type": "file",
+        "path": "compile_commands.json",
+        "severity": "error",
+        "hint": "Generate a clang compilation database. Unreal: .\\Engine\\Build\\BatchFiles\\RunUBT.bat UnrealEditor Win64 Development -Mode=GenerateClangDatabase -engine -progress"
+      },
+      {
+        "type": "dir",
+        "path": ".cache/clangd/index",
+        "severity": "error",
+        "hint": "Start clangd and wait for background indexing to complete."
+      }
+    ],
+    "cleanup": "pch"
+  },
+  "extraction": {
+    "includeRegex": "\\.(cpp|cc|cxx|h|hpp|inl|c)$",
+    "excludeRegex": "[/\\\\](\\.git|architecture|Binaries|Build|DerivedDataCache|Intermediate|Saved|\\.vs|ThirdParty|GeneratedFiles|AutomationTool)([/\\\\]|$)",
+    "depScan": ["#\\s*include\\s+\"([^\"]+)\""],
+    "depSectionTitle": "Direct Include Dependencies",
+    "commentPrefix": "//",
+    "fence": "cpp"
+  },
+  "docgen": {
+    "codebaseDescDefault": "C/C++ codebase",
+    "trivialPatterns": ["\\.generated\\.h$", "\\.gen\\.cpp$", "^Module\\.[A-Za-z0-9_]+\\.cpp$", "Classes\\.h$"],
+    "trivialIncludesOnly": true,
+    "trivialIncludesOnlyRegex": "^\\s*(#\\s*(include|pragma|ifndef|define|endif)|//|/\\*|\\*/)",
+    "importBundling": { "regex": "#\\s*include\\s+\"([^\"]+)\"" },
+    "inheritanceRegex": "class\\s+{class}\\s*:\\s*public\\s+(\\w+)",
+    "blobCommentPrefixes": "^(//|/\\*|\\*|\\*/|#)",
+    "promptOverrides": {}
+  }
+}

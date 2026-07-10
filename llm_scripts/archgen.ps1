@@ -64,70 +64,10 @@ function Get-SHA1($filePath) {
     return ($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') }) -join ''
 }
 
-function Get-Preset($name) {
-    switch ($name.ToLower()) {
-        { $_ -in @('quake','quake2','quake3','doom','idtech') } {
-            return @{
-                Include = '\.(c|cc|cpp|cxx|h|hh|hpp|inl|inc)$'
-                Exclude = '[/\\](\.git|architecture|build|out|dist|obj|bin|Debug|Release|x64|Win32|\.vs|\.vscode|baseq2|baseq3|base)([/\\]|$)'
-                Desc    = 'C game engine codebase (id Software / Quake-family)'
-                Fence   = 'c'
-            }
-        }
-        { $_ -in @('unreal','ue4','ue5') } {
-            return @{
-                Include = '\.(cpp|h|hpp|cc|cxx|inl|cs)$'
-                Exclude = '[/\\](\.git|architecture|Binaries|Build|DerivedDataCache|Intermediate|Saved|\.vs|ThirdParty|GeneratedFiles|AutomationTool)([/\\]|$)'
-                Desc    = 'Unreal Engine C++/C# source (Epic Games). Core, CoreUObject, Engine, Renderer, PhysicsCore/Chaos, AudioMixerCore, AIModule, GameplayAbilities (GAS), Slate/UMG, NetworkCore.'
-                Fence   = 'cpp'
-            }
-        }
-        'godot' {
-            return @{
-                Include = '\.(cpp|h|hpp|c|cc|gd|gdscript|tscn|tres|cs)$'
-                Exclude = '[/\\](\.git|architecture|\.godot|\.import|build|export)([/\\]|$)'
-                Desc    = 'Godot engine codebase (C++/GDScript/C#)'
-                Fence   = 'cpp'
-            }
-        }
-        'unity' {
-            return @{
-                Include = '\.(cs|shader|cginc|hlsl|compute|glsl|cpp|c|h)$'
-                Exclude = '[/\\](\.git|architecture|Library|Temp|Obj|Build|Builds|Logs|UserSettings|\.vs)([/\\]|$)'
-                Desc    = 'Unity game codebase (C#/shader)'
-                Fence   = 'csharp'
-            }
-        }
-        { $_ -in @('source','valve') } {
-            return @{
-                Include = '\.(cpp|h|hpp|c|cc|cxx|inl|inc|vpc|vgc)$'
-                Exclude = '[/\\](\.git|architecture|build|out|obj|bin|Debug|Release|lib|thirdparty)([/\\]|$)'
-                Desc    = 'Source Engine codebase (Valve / C++)'
-                Fence   = 'cpp'
-            }
-        }
-        'rust' {
-            return @{
-                Include = '\.(rs|toml)$'
-                Exclude = '[/\\](\.git|architecture|target|\.cargo)([/\\]|$)'
-                Desc    = 'Rust game engine codebase'
-                Fence   = 'rust'
-            }
-        }
-        '' {
-            return @{
-                Include = '\.(c|cc|cpp|cxx|h|hh|hpp|inl|inc|cs|java|py|rs|lua|gd|gdscript|m|mm|swift)$'
-                Exclude = '[/\\](\.git|architecture|build|out|dist|obj|bin|Debug|Release|\.vs|\.vscode|node_modules|\.godot|Library|Temp)([/\\]|$)'
-                Desc    = 'game engine / game codebase'
-                Fence   = 'c'
-            }
-        }
-        default {
-            Write-Err "Unknown preset: $name. Available: quake, doom, unreal, godot, unity, source, rust"
-            exit 2
-        }
-    }
-}
+# Presets + language profiles live in the shared module (single source of
+# truth, also consumed by serena_extract.ps1 and friends). This script uses
+# the doc-gen fields: Include / Exclude / Desc / Fence.
+. (Join-Path $PSScriptRoot 'preset_core.ps1')
 
 # -- Load config -----------------------------------------------
 
