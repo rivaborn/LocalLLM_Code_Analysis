@@ -443,11 +443,24 @@ function Invoke-ProgressBeat($line) {
     $script:notifyLastBeat = [datetime]::Now
     try { Invoke-RestMethod -Uri $notifyUrl -Method Post -Body $line -Headers @{ Title = "$notifyPrefix Pass 2 progress" } -ContentType 'text/plain; charset=utf-8' -TimeoutSec 10 | Out-Null } catch {}
 }
-$includeRx     = Cfg $cfg 'INCLUDE_EXT_REGEX' '\.(c|cc|cpp|cxx|h|hh|hpp|inl|inc|cs|java|py|rs|lua|gd|m|mm|swift)$'
+# Language profile: non-cpp profiles supply their own regex/fence/desc
+# defaults (via .env PROFILE); cpp keeps the legacy multi-language defaults.
+. (Join-Path $PSScriptRoot 'preset_core.ps1')
+$p2ProfileName = Cfg $cfg 'PROFILE' 'cpp'
+$p2ProfileObj  = Get-LangProfile $p2ProfileName
+$p2IncludeDefault = '\.(c|cc|cpp|cxx|h|hh|hpp|inl|inc|cs|java|py|rs|lua|gd|m|mm|swift)$'
+$p2FenceDefault   = 'c'
+$p2DescDefault    = 'game engine / game codebase'
+if ($p2ProfileName -ne 'cpp') {
+    $p2IncludeDefault = $p2ProfileObj.extraction.includeRegex
+    $p2FenceDefault   = $p2ProfileObj.extraction.fence
+    $p2DescDefault    = $p2ProfileObj.docgen.codebaseDescDefault
+}
+$includeRx     = Cfg $cfg 'INCLUDE_EXT_REGEX' $p2IncludeDefault
 $excludeRx     = Cfg $cfg 'EXCLUDE_DIRS_REGEX' '[/\\](\.git|architecture|build|out|dist|obj|bin)([/\\]|$)'
 $extraExclude  = Cfg $cfg 'EXTRA_EXCLUDE_REGEX' ''
-$defaultFence  = Cfg $cfg 'DEFAULT_FENCE' 'c'
-$codebaseDesc  = Cfg $cfg 'CODEBASE_DESC' 'game engine / game codebase'
+$defaultFence  = Cfg $cfg 'DEFAULT_FENCE' $p2FenceDefault
+$codebaseDesc  = Cfg $cfg 'CODEBASE_DESC' $p2DescDefault
 $detectDataBlob   = Cfg $cfg 'DETECT_DATA_BLOB' '1'
 $dataBlobMinLines = [int](Cfg $cfg 'DATA_BLOB_MIN_LINES' '2000')
 $dataBlobFrac     = [double](Cfg $cfg 'DATA_BLOB_FRACTION' '0.6')
@@ -627,10 +640,12 @@ if (Test-Path $hashDbPath) {
 function Test-DataBlobFile($fullPath, $minLines, $dataFrac) {
     $lines = @(Get-Content $fullPath -ErrorAction SilentlyContinue)
     if ($lines.Count -lt $minLines) { return $false }
+    $blobCommentRx = "$($p2ProfileObj.docgen.blobCommentPrefixes)"
+    if ($blobCommentRx -eq '') { $blobCommentRx = '^(//|/\*|\*|\*/|#)' }
     $code = 0; $data = 0
     foreach ($ln in $lines) {
         $t = $ln.Trim()
-        if ($t -eq '' -or $t -match '^(//|/\*|\*|\*/|#)') { continue }   # blank / comment / preprocessor
+        if ($t -eq '' -or $t -match $blobCommentRx) { continue }   # blank / comment / preprocessor
         $code++
         if ($t -match '^[\s{}()]*((0[xX][0-9A-Fa-f]+|[+-]?[0-9][0-9.eEfFuUlL+-]*)[\s,;{}()]*)+$') { $data++ }
     }

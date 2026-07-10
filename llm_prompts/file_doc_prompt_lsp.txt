@@ -4,7 +4,7 @@ You will be given:
 - FILE PATH (relative)
 - LSP ANALYSIS CONTEXT (if available): precise symbol definitions, incoming references
   (which files/functions call into this file), and direct include dependencies.
-  This data comes from clangd static analysis and is AUTHORITATIVE -- use it to populate
+  This data comes from language-server (LSP) static analysis and is AUTHORITATIVE -- use it to populate
   cross-references accurately rather than guessing.
 - FILE CONTENT
 - Possibly: BUNDLED HEADERS

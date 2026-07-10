@@ -95,7 +95,18 @@ function Format-Hours($minutes) {
 function Get-AnalyzableFileCount($Target) {
     $root = if ($Target -ne '.' -and $Target -ne 'all') { Join-Path $repoRoot $Target } else { $repoRoot }
     if (-not (Test-Path $root)) { return 0 }
-    $incRx = Get-EnvVal 'INCLUDE_EXT_REGEX'; if (-not $incRx) { $incRx = '\.(cpp|h|hpp|cc|cxx|inl|cs)$' }
+    $incRx = Get-EnvVal 'INCLUDE_EXT_REGEX'
+    if (-not $incRx) {
+        # Preset / language-profile aware default (legacy UE fallback).
+        . (Join-Path $PSScriptRoot 'preset_core.ps1')
+        if ($Preset -ne '') {
+            $incRx = (Get-Preset $Preset).Include
+        } else {
+            $envProf = Get-EnvVal 'PROFILE'
+            if ($envProf) { $incRx = (Get-LangProfile $envProf).extraction.includeRegex }
+            else          { $incRx = '\.(cpp|h|hpp|cc|cxx|inl|cs)$' }
+        }
+    }
     $excRx = Get-EnvVal 'EXCLUDE_DIRS_REGEX'
     $n = 0
     try {

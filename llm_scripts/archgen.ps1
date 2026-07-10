@@ -101,6 +101,24 @@ $excludeRx    = Cfg 'EXCLUDE_DIRS_REGEX'  $presetData.Exclude
 $extraExclude = Cfg 'EXTRA_EXCLUDE_REGEX' ''
 $codebaseDesc = Cfg 'CODEBASE_DESC'       $presetData.Desc
 $defaultFence = Cfg 'DEFAULT_FENCE'       $presetData.Fence
+
+# -- Language profile (language-specific doc-gen behavior) ------
+# NB: local must not be named $langProfile / any [string] param name
+# (case-insensitive type coercion).
+$profileName = Resolve-ProfileName $presetData (Cfg 'PROFILE' '')
+$profileObj  = Get-LangProfile $profileName
+$env:ARCH_PROFILE = $profileName
+# Bare runs (no preset) with a non-cpp profile pick up the profile's
+# fence/description instead of the generic C-family defaults.
+if ($presetName -eq '' -and $profileName -ne 'cpp') {
+    $codebaseDesc = Cfg 'CODEBASE_DESC' $profileObj.docgen.codebaseDescDefault
+    $defaultFence = Cfg 'DEFAULT_FENCE' $profileObj.extraction.fence
+}
+# Header bundling and the base-class pattern cache are C/C++-only features
+# until per-language equivalents exist; profiles opt in via
+# docgen.importBundling / docgen.inheritanceRegex (null = off).
+if ($null -eq $profileObj.docgen.importBundling)   { $bundleHdrs = '0' }
+if ($null -eq $profileObj.docgen.inheritanceRegex) { $patternCache = '0' }
 $skipTrivial  = Cfg 'SKIP_TRIVIAL'       '1'
 $tieredModel  = Cfg 'TIERED_MODEL'       '1'
 $highModel    = Cfg 'HIGH_COMPLEXITY_MODEL' 'sonnet'
@@ -237,12 +255,16 @@ if ($llmBackend -ne 'claude') {
 $minimalPromptFile = Join-Path $promptDir 'file_doc_prompt_minimal.txt'
 if (-not (Test-Path $minimalPromptFile)) { $minimalPromptFile = '' }
 
-# Opt v2#2: Engine knowledge preamble
+# Opt v2#2: Engine knowledge preamble - preset-level (unreal ->
+# ue_preamble.txt; other presets / bare runs have none).
 $preambleContent = ''
 if ($usePreamble -eq '1') {
-    $preamblePath = Join-Path $promptDir 'ue_preamble.txt'
-    if (Test-Path $preamblePath) {
-        $preambleContent = Get-Content $preamblePath -Raw
+    $preambleName = "$($presetData.PreambleFile)"
+    if ($preambleName -ne '') {
+        $preamblePath = Join-Path $promptDir $preambleName
+        if (Test-Path $preamblePath) {
+            $preambleContent = Get-Content $preamblePath -Raw
+        }
     }
 }
 
@@ -290,12 +312,14 @@ Get-Content $hashDbPath | ForEach-Object {
 
 # -- Trivial file detection ------------------------------------
 
-$trivialPatterns = @(
-    '\.generated\.h$',
-    '\.gen\.cpp$',
-    '^Module\.[A-Za-z0-9_]+\.cpp$',
-    'Classes\.h$'
-)
+# Generated/boilerplate filename patterns come from the language profile
+# (cpp: UE .generated.h / .gen.cpp / Module.*.cpp / Classes.h).
+$trivialPatterns = @()
+if ($null -ne $profileObj.docgen.trivialPatterns) {
+    $trivialPatterns = @($profileObj.docgen.trivialPatterns)
+}
+$trivialIncludesOnly   = [bool]$profileObj.docgen.trivialIncludesOnly
+$trivialIncludesOnlyRx = "$($profileObj.docgen.trivialIncludesOnlyRegex)"
 
 function Test-TrivialFile($rel, $fullPath, $minLines) {
     # Check filename patterns
@@ -306,12 +330,14 @@ function Test-TrivialFile($rel, $fullPath, $minLines) {
     # Check line count
     $lines = @(Get-Content $fullPath -ErrorAction SilentlyContinue)
     if ($lines.Count -lt $minLines) { return $true }
-    # Check if file is purely includes (no logic)
-    $nonInclude = $lines | Where-Object {
-        $_.Trim() -ne '' -and
-        $_ -notmatch '^\s*(#\s*(include|pragma|ifndef|define|endif)|//|/\*|\*/)'
+    # Check if file is purely includes (no logic) - C-family only
+    if ($trivialIncludesOnly -and $trivialIncludesOnlyRx -ne '') {
+        $nonInclude = $lines | Where-Object {
+            $_.Trim() -ne '' -and
+            $_ -notmatch $trivialIncludesOnlyRx
+        }
+        if (@($nonInclude).Count -le 2) { return $true }
     }
-    if (@($nonInclude).Count -le 2) { return $true }
     return $false
 }
 
@@ -328,10 +354,12 @@ function Test-DataBlobFile($fullPath, $minLines, $dataFrac) {
     # files instead of burning retries + a doomed escalation on them.
     $lines = @(Get-Content $fullPath -ErrorAction SilentlyContinue)
     if ($lines.Count -lt $minLines) { return $false }
+    $blobCommentRx = "$($profileObj.docgen.blobCommentPrefixes)"
+    if ($blobCommentRx -eq '') { $blobCommentRx = '^(//|/\*|\*|\*/|#)' }
     $code = 0; $data = 0
     foreach ($ln in $lines) {
         $t = $ln.Trim()
-        if ($t -eq '' -or $t -match '^(//|/\*|\*|\*/|#)') { continue }   # blank / comment / preprocessor
+        if ($t -eq '' -or $t -match $blobCommentRx) { continue }   # blank / comment / preprocessor
         $code++
         # A "data" line is purely numeric/hex literals separated by , ; { } ( ) --
         # identifiers/keywords never match (the numeric branch must start with a

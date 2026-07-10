@@ -220,7 +220,8 @@ function Build-Payload($stage, $rel, $src, $repoRoot, $fence, $srcLines, $maxFil
     $usedTrimmed = $false
     if ($limit -gt 0 -and $lineCount -gt $limit -and $stage -le 1 -and $serenaContext -match '## Trimmed Source') {
         # Extract trimmed source from LSP context
-        $trimMatch = [regex]::Match($serenaContext, '## Trimmed Source \(key sections only\)\s*```cpp\s*([\s\S]*?)```')
+        # Fence language varies per profile (```cpp, ```lua, ...).
+        $trimMatch = [regex]::Match($serenaContext, '## Trimmed Source \(key sections only\)\s*```\w*\s*([\s\S]*?)```')
         if ($trimMatch.Success) {
             $content = $trimMatch.Groups[1].Value.Trim()
             $content = "/* LSP-TRIMMED: key sections from $lineCount total lines */`n$content"
