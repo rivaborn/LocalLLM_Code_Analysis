@@ -1,0 +1,9 @@
+{
+  "name": "ts-smoke-fixture",
+  "private": true,
+  "version": "1.0.0",
+  "description": "typescript-language-server resolves tsserver from the workspace; run `npm install` here before the typescript profile smoke test.",
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

@@ -25,6 +25,12 @@
         "path": "tsconfig.json",
         "severity": "warn",
         "hint": "No tsconfig.json at the repo root; the server falls back to an inferred project (cross-file references may be weaker)."
+      },
+      {
+        "type": "dir",
+        "path": "node_modules/typescript",
+        "severity": "error",
+        "hint": "typescript-language-server needs the 'typescript' package in the workspace: run `npm install typescript` at the repo root (initialize fails without it and every file returns empty symbols)."
       }
     ],
     "cleanup": null

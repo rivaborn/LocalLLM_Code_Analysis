@@ -172,11 +172,14 @@ class LspClient:
             cmd[0] = exe
         elif "/" in cmd[0] or os.sep in cmd[0]:
             cmd[0] = os.path.abspath(cmd[0])
+        # SERENA_LSP_DEBUG=1 lets the server's stderr through (server
+        # startup problems are otherwise invisible).
+        stderr_target = None if os.environ.get("SERENA_LSP_DEBUG") == "1" else subprocess.DEVNULL
         self.proc = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=stderr_target,
         )
         self._request_id = 0
         self._lock = threading.Lock()
