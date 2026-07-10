@@ -53,7 +53,7 @@ Runs every stage above in order, writes **`Run Report.md`** (default `architectu
 
 ## 2. serena_extract.ps1 — LSP Context Extraction
 
-Extracts symbol overviews and cross-file references from clangd using adaptive parallel workers. Zero Claude calls. Automatically scales worker count based on available RAM.
+Extracts symbol overviews and cross-file references from a language server (clangd, lua-language-server, jedi, typescript-language-server, gopls — per the language profile) using adaptive parallel workers. Zero Claude calls. Automatically scales worker count based on available RAM.
 
 ### Syntax
 
@@ -61,6 +61,7 @@ Extracts symbol overviews and cross-file references from clangd using adaptive p
 .\llm_scripts\serena_extract.ps1
     [-TargetDir <string>]
     [-Preset <string>]
+    [-LangProfile <string>]
     [-Jobs <int>]
     [-Workers <int>]
     [-Force]
@@ -69,6 +70,7 @@ Extracts symbol overviews and cross-file references from clangd using adaptive p
     [-MinFreeRAM <double>]
     [-RAMPerWorker <double>]
     [-EnvFile <string>]
+    [-ServerPath <string>]
     [-ClangdPath <string>]
 ```
 
@@ -77,16 +79,18 @@ Extracts symbol overviews and cross-file references from clangd using adaptive p
 | Parameter       | Type   | Default    | Description                                                                                              |
 |-----------------|--------|------------|----------------------------------------------------------------------------------------------------------|
 | `-TargetDir`    | string | `"."`      | Subdirectory to scan (relative to repo root). Use `"."` for entire repo.                                 |
-| `-Preset`       | string | `""`       | Engine preset for include/exclude patterns. See [Presets](#14-presets). Falls back to `PRESET` in `.env`. |
-| `-Jobs`         | int    | `2`        | clangd `-j` flag: number of internal **threads** each clangd process uses for background work.           |
-| `-Workers`      | int    | `0`        | Number of clangd **processes** (each is a separate instance with its own LSP connection). `0` = auto-detect based on free RAM. |
+| `-Preset`       | string | `""`       | Codebase preset for include/exclude patterns + language profile. See [Presets](#14-presets). Falls back to `PRESET` in `.env`. |
+| `-LangProfile`  | string | `""`       | Language profile override (`llm_profiles\<name>.json`). Precedence: this flag > preset's `Profile` > `.env PROFILE` > `cpp`. |
+| `-Jobs`         | int    | `2`        | clangd `-j` flag: number of internal **threads** each clangd process uses for background work (cpp only). |
+| `-Workers`      | int    | `0`        | Number of server **processes** (each is a separate instance with its own LSP connection). `0` = auto-detect based on free RAM. |
 | `-Force`        | switch | off        | Re-extract all files even if `.serena_context.txt` already exists and source is unchanged.                |
 | `-SkipRefs`     | switch | off        | Skip reference queries. Much faster — extracts symbols and trimmed source only, no incoming references.   |
 | `-Compress`     | switch | off        | LSP compression: collapses classes to "ClassName (Class, N methods)", keeps only top-10 functions.        |
 | `-MinFreeRAM`   | double | `6.0`      | Minimum free RAM in GB to maintain. Workers are shed if free RAM drops below this.                        |
-| `-RAMPerWorker` | double | `5.0`      | Estimated RAM per clangd instance in GB. Used for auto-detect and scaling decisions.                      |
+| `-RAMPerWorker` | double | `0`        | Estimated RAM per server instance in GB. `0` = use the profile's value (cpp 5.0, lua 1.5, ...).           |
 | `-EnvFile`      | string | `".env"`   | Path to environment configuration file.                                                                  |
-| `-ClangdPath`   | string | `"clangd"` | Path to clangd binary. Use full path if clangd is not in `$PATH`.                                        |
+| `-ServerPath`   | string | `""`       | Path to the language-server binary. Empty = the profile's command resolved via `$PATH`.                  |
+| `-ClangdPath`   | string | `""`       | Deprecated alias for `-ServerPath`.                                                                      |
 
 ### Adaptive Parallelism
 
@@ -98,7 +102,7 @@ The script runs multiple clangd instances in parallel, automatically scaling bas
 - **Checks**: RAM is monitored every ~60 seconds
 - **Work distribution**: All workers pull from a shared queue — whoever finishes first grabs the next file
 
-Each clangd instance is restarted every 1000 files to reclaim accumulated memory.
+Each server instance is restarted after the profile's `restartInterval` files to reclaim accumulated memory (cpp: 1000; lua: 150 — lua-language-server starts returning empty symbol lists after a few hundred didOpen/didClose cycles). Workers launch and warm their servers in parallel. NOTE: if the wrapper process is killed (not Ctrl+C'd), the language-server child processes survive — check `Get-Process lua-language-server` (or `clangd`) and stop orphans if RAM disappears. Reference sections are richest on long-lived servers: lua-language-server only resolves cross-file references for files whose referrers it has already analyzed, so short resumed sessions yield symbols/requires but sparse references.
 
 ### PCH Disk Usage
 
@@ -251,7 +255,9 @@ python serena_extract.py
     --repo-root <path>
     [--target-dir <path>]
     [--output-dir <path>]
-    [--clangd-path <path>]
+    [--profile <name>]
+    [--profiles-dir <path>]
+    [--server-path <path>]
     [--jobs <int>]
     [--workers <int>]
     [--file-list <path>]
@@ -270,16 +276,20 @@ python serena_extract.py
 | `--repo-root`      | string | *(required)*                         | Absolute path to the repository root.                                                    |
 | `--target-dir`     | string | `"."`                                | Subdirectory to scan within the repo root.                                               |
 | `--output-dir`     | string | `architecture/.serena_context`       | Output directory for `.serena_context.txt` files.                                        |
-| `--clangd-path`    | string | `"clangd"`                           | Path to clangd binary.                                                                   |
-| `--jobs`           | int    | `2`                                  | clangd `-j` parallelism per instance.                                                    |
-| `--workers`        | int    | `0`                                  | Max parallel clangd instances. `0` = auto based on free RAM.                             |
+| `--profile`        | string | `"cpp"`                              | Language profile (`llm_profiles/<name>.json`): server command, languageId, warmup, regexes, RAM sizing. |
+| `--profiles-dir`   | string | `<script>/../llm_profiles`           | Directory containing the profile JSONs.                                                  |
+| `--server-path`    | string | *(profile's command)*                | Path to the language-server binary. `--clangd-path` is a deprecated alias.               |
+| `--jobs`           | int    | `2`                                  | clangd `-j` parallelism per instance (cpp profile only).                                 |
+| `--workers`        | int    | `0`                                  | Max parallel server instances. `0` = auto based on free RAM.                             |
 | `--file-list`      | string | `None`                               | Path to a text file containing one relative path per line. Overrides directory scanning.  |
-| `--include-rx`     | regex  | `\.(cpp\|cc\|cxx\|h\|hpp\|inl\|c)$` | Regex for file extensions to include.                                                    |
-| `--exclude-rx`     | regex  | *(long default)*                     | Regex for directories/paths to exclude.                                                  |
+| `--include-rx`     | regex  | *(from profile)*                     | Regex for file extensions to include.                                                    |
+| `--exclude-rx`     | regex  | *(from profile)*                     | Regex for directories/paths to exclude.                                                  |
 | `--force`          | flag   | off                                  | Re-extract even if context file exists and source is unchanged.                          |
 | `--skip-refs`      | flag   | off                                  | Skip reference queries. Extracts symbols and trimmed source only.                        |
 | `--min-free-ram`   | float  | `6.0`                                | Minimum free RAM in GB to maintain.                                                      |
-| `--ram-per-worker` | float  | `5.0`                                | Estimated RAM per clangd instance in GB.                                                 |
+| `--ram-per-worker` | float  | *(from profile)*                     | Estimated RAM per server instance in GB (cpp 5.0, lua 1.5, ...).                         |
+
+Env var `SERENA_LSP_DEBUG=1` passes the server's stderr through (otherwise DEVNULL) — use it when files come back "0 symbols" unexpectedly.
 
 ### Examples
 

@@ -125,6 +125,12 @@ Implementation: `llm_core.ps1` (`Get-LLMBackend` / `Get-LLMEndpoint` / `Get-LLMM
 ### LSP server->client requests were dropped (FIXED)
 `_read_loop` only dispatched responses; server->client REQUESTS (`workspace/configuration`, `client/registerCapability`, `window/workDoneProgress/create`) were discarded. clangd tolerates it; lua-language-server/gopls/pyright stall waiting for the reply. A generic responder now answers them (plus a stdin write lock — responses come from the reader thread).
 
+### lua-language-server: session degradation + reference warm-up
+Two operational findings from the KOReader e2e run: (1) a long-lived instance (~300 didOpen/didClose cycles, ~2.3 GB resident) starts answering documentSymbol with `[]` for files it handles fine when fresh — the lua profile restarts every 150 files for this; (2) cross-file references are an emergent property of server lifetime (it resolves references best for files whose referrers it already analyzed), so short/resumed sessions produce symbols + requires but sparse `## Incoming References` sections — one long uninterrupted run beats many short ones. Also: giant pure-data Lua files (e.g. KOReader's `zh_stroke_data.lua`, ~1 MB literal table) can hang a fresh server outright.
+
+### Killed wrappers leak language-server processes
+Hard-killing serena_extract (timeout, Stop-Process) leaves its child language servers running — they hold RAM invisibly and the auto-scaler then sheds workers on the NEXT run. Check `Get-Process lua-language-server` / `clangd` and stop orphans if free RAM looks wrong.
+
 ### typescript-language-server: workspace typescript required
 `initialize` FAILS ("Could not find a valid TypeScript installation") when the target repo has no `node_modules/typescript` — global npm installs are not searched — and the server then answers every documentSymbol with `[]` (files land in the EMPTY bucket with no error). Encoded as an error-severity prereq in `llm_profiles\typescript.json`; fix is `npm install typescript` at the target root.
 
