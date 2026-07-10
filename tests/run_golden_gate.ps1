@@ -19,6 +19,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# powershell -File can't bind arrays; accept space-joined entries too
+# (-ExtraArgs '--profile cpp').
+$ExtraArgs = @($ExtraArgs | ForEach-Object { "$_" -split ' ' } | Where-Object { $_ -ne '' })
 $repo = Split-Path $PSScriptRoot -Parent
 $fixture = Join-Path $repo 'tests\fixtures\cpp'
 $golden = Join-Path $repo 'tests\golden\cpp'

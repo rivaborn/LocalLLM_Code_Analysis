@@ -26,17 +26,21 @@
 param(
     [string]$TargetDir  = ".",
     [string]$Preset     = "",
+    [string]$LangProfile = "",
     [int]   $Jobs       = 2,
     [int]   $Workers    = 0,
     [switch]$Force,
     [switch]$SkipRefs,
     [switch]$Compress,
     [double]$MinFreeRAM = 6.0,
-    [double]$RAMPerWorker = 5.0,
+    [double]$RAMPerWorker = 0,
     [string]$EnvFile    = ".env",
-    [string]$ClangdPath = "clangd",
+    [string]$ServerPath = "",
+    [string]$ClangdPath = "",
     [switch]$Test
 )
+# -RAMPerWorker 0 / -ServerPath '' mean "use the language profile's value".
+# -ClangdPath is a deprecated alias for -ServerPath.
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -71,7 +75,7 @@ function Cfg($key, $default = '') {
 . (Join-Path $PSScriptRoot 'preset_core.ps1')
 
 function Build-PyArgs(
-    $extractScript, $repoRoot, $targetDir, $clangdPath,
+    $extractScript, $repoRoot, $targetDir, $profileName, $serverPath,
     $jobs, $workers, $minFreeRAM, $ramPerWorker,
     $includeRx, $excludeRx, $force, $skipRefs, $compress
 ) {
@@ -79,14 +83,18 @@ function Build-PyArgs(
         $extractScript,
         "--repo-root", $repoRoot,
         "--target-dir", $targetDir,
-        "--clangd-path", $clangdPath,
+        "--profile", $profileName,
         "--jobs", $jobs,
         "--workers", $workers,
-        "--min-free-ram", $minFreeRAM,
-        "--ram-per-worker", $ramPerWorker,
-        "--include-rx", $includeRx,
-        "--exclude-rx", $excludeRx
+        "--min-free-ram", $minFreeRAM
     )
+
+    # Only override the profile's defaults when a value was actually given —
+    # always passing e.g. --server-path clangd would break non-cpp profiles.
+    if ($serverPath -ne '')   { $pyArgs += @("--server-path", $serverPath) }
+    if ($ramPerWorker -gt 0)  { $pyArgs += @("--ram-per-worker", $ramPerWorker) }
+    if ($includeRx -ne '')    { $pyArgs += @("--include-rx", $includeRx) }
+    if ($excludeRx -ne '')    { $pyArgs += @("--exclude-rx", $excludeRx) }
 
     if ($force)    { $pyArgs += "--force" }
     if ($skipRefs) { $pyArgs += "--skip-refs" }
@@ -236,24 +244,36 @@ if ($Test) {
         Write-Host "--- Build-PyArgs ---" -ForegroundColor Yellow
 
         # base args always present
-        $args1 = Build-PyArgs 'extract.py' 'C:/repo' '.' 'clangd' 2 0 6.0 5.0 '\.cpp$' '\.git' $false $false $false
+        $args1 = Build-PyArgs 'extract.py' 'C:/repo' '.' 'cpp' 'clangd' 2 0 6.0 5.0 '\.cpp$' '\.git' $false $false $false
         Assert-True ($args1 -contains 'extract.py') 'Build-PyArgs: contains script path'
         Assert-True ($args1 -contains '--repo-root') 'Build-PyArgs: contains --repo-root'
         Assert-True ($args1 -contains 'C:/repo') 'Build-PyArgs: contains repo root value'
+        Assert-True ($args1 -contains '--profile') 'Build-PyArgs: contains --profile'
+        Assert-True ($args1 -contains 'cpp') 'Build-PyArgs: contains profile value'
         Assert-True ($args1 -contains '--jobs') 'Build-PyArgs: contains --jobs'
+        Assert-True ($args1 -contains '--server-path') 'Build-PyArgs: --server-path when given'
+        Assert-True ($args1 -contains '--ram-per-worker') 'Build-PyArgs: --ram-per-worker when > 0'
         Assert-True ($args1 -contains '--include-rx') 'Build-PyArgs: contains --include-rx'
         Assert-False ($args1 -contains '--force') 'Build-PyArgs: no --force when false'
         Assert-False ($args1 -contains '--skip-refs') 'Build-PyArgs: no --skip-refs when false'
         Assert-False ($args1 -contains '--compress') 'Build-PyArgs: no --compress when false'
 
+        # profile defaults win when overrides are unset
+        $args1b = Build-PyArgs 'extract.py' 'C:/repo' '.' 'lua' '' 2 0 6.0 0 '' '' $false $false $false
+        Assert-False ($args1b -contains '--server-path') 'Build-PyArgs: no --server-path when empty (profile default)'
+        Assert-False ($args1b -contains '--ram-per-worker') 'Build-PyArgs: no --ram-per-worker when 0 (profile default)'
+        Assert-False ($args1b -contains '--include-rx') 'Build-PyArgs: no --include-rx when empty (profile default)'
+        Assert-False ($args1b -contains '--exclude-rx') 'Build-PyArgs: no --exclude-rx when empty (profile default)'
+        Assert-True ($args1b -contains 'lua') 'Build-PyArgs: lua profile forwarded'
+
         # conditional flags
-        $args2 = Build-PyArgs 'extract.py' 'C:/repo' '.' 'clangd' 2 0 6.0 5.0 '\.cpp$' '\.git' $true $true $true
+        $args2 = Build-PyArgs 'extract.py' 'C:/repo' '.' 'cpp' 'clangd' 2 0 6.0 5.0 '\.cpp$' '\.git' $true $true $true
         Assert-True ($args2 -contains '--force') 'Build-PyArgs: --force when true'
         Assert-True ($args2 -contains '--skip-refs') 'Build-PyArgs: --skip-refs when true'
         Assert-True ($args2 -contains '--compress') 'Build-PyArgs: --compress when true'
 
         # individual flags
-        $args3 = Build-PyArgs 'extract.py' 'C:/repo' '.' 'clangd' 2 0 6.0 5.0 '\.cpp$' '\.git' $true $false $false
+        $args3 = Build-PyArgs 'extract.py' 'C:/repo' '.' 'cpp' 'clangd' 2 0 6.0 5.0 '\.cpp$' '\.git' $true $false $false
         Assert-True ($args3 -contains '--force') 'Build-PyArgs: only --force'
         Assert-False ($args3 -contains '--skip-refs') 'Build-PyArgs: no --skip-refs'
         Assert-False ($args3 -contains '--compress') 'Build-PyArgs: no --compress'
@@ -310,8 +330,20 @@ if ($Test) {
 $cfg = Read-EnvFile $EnvFile
 $presetName = if ($Preset -ne '') { $Preset } else { Cfg 'PRESET' '' }
 $presetData = Get-Preset $presetName
-$includeRx  = Cfg 'INCLUDE_EXT_REGEX'  $presetData.LspInclude
-$excludeRx  = Cfg 'EXCLUDE_DIRS_REGEX' $presetData.LspExclude
+
+# Profile precedence: -LangProfile > preset's Profile > .env PROFILE > cpp.
+$profileName = if ($LangProfile -ne '') { $LangProfile } else { Resolve-ProfileName $presetData (Cfg 'PROFILE' '') }
+$langProfile = Get-LangProfile $profileName
+
+# Regex precedence: .env override > named preset > the profile's own
+# defaults (passed as '' so Build-PyArgs omits the flag and the Python
+# side falls back to the profile).
+$presetInclude = if ($presetName -ne '') { $presetData.LspInclude } else { '' }
+$presetExclude = if ($presetName -ne '') { $presetData.LspExclude } else { '' }
+$includeRx  = Cfg 'INCLUDE_EXT_REGEX'  $presetInclude
+$excludeRx  = Cfg 'EXCLUDE_DIRS_REGEX' $presetExclude
+
+$serverPath = if ($ServerPath -ne '') { $ServerPath } else { $ClangdPath }
 
 $repoRoot = (Get-Location).Path
 try {
@@ -319,20 +351,21 @@ try {
     if ($LASTEXITCODE -eq 0 -and $g) { $repoRoot = $g.Trim() }
 } catch {}
 
-# -- Verify prerequisites ----------------------------------------
+# -- Verify prerequisites (per language profile) -------------------
 
-$compileDb = Join-Path $repoRoot 'compile_commands.json'
-if (-not (Test-Path $compileDb)) {
-    Write-Err "Missing: compile_commands.json at $repoRoot"
-    Write-Err "Run: .\Engine\Build\BatchFiles\RunUBT.bat UnrealEditor Win64 Development -Mode=GenerateClangDatabase -engine -progress"
-    exit 2
-}
-
-$indexDir = Join-Path $repoRoot '.cache\clangd\index'
-if (-not (Test-Path $indexDir)) {
-    Write-Err "No clangd index found at $indexDir"
-    Write-Err "Start Serena/clangd and wait for background indexing to complete."
-    exit 2
+$prereqs = @()
+if ($null -ne $langProfile.server.prereqs) { $prereqs = @($langProfile.server.prereqs) }
+foreach ($pr in $prereqs) {
+    $target = Join-Path $repoRoot $pr.path
+    if (-not (Test-Path $target)) {
+        if ("$($pr.severity)" -eq 'error') {
+            Write-Err "Missing: $($pr.path) at $repoRoot"
+            Write-Err "  $($pr.hint)"
+            exit 2
+        }
+        Write-Host "Warning: $($pr.path) not found at $repoRoot" -ForegroundColor Yellow
+        Write-Host "  $($pr.hint)" -ForegroundColor Yellow
+    }
 }
 
 $extractScript = Join-Path $PSScriptRoot 'serena_extract.py'
@@ -343,20 +376,22 @@ if (-not (Test-Path $extractScript)) {
 
 # -- Banner ----------------------------------------------------
 
+$serverDisplay = if ($serverPath -ne '') { $serverPath } else { @($langProfile.server.command)[0] }
 Write-Host '============================================' -ForegroundColor Yellow
 Write-Host '  serena_extract.ps1 - LSP Context Extract' -ForegroundColor Yellow
 Write-Host '============================================' -ForegroundColor Yellow
 Write-Host "Repo root:   $repoRoot"
 Write-Host "Target:      $TargetDir"
-Write-Host "clangd:      $ClangdPath (-j=$Jobs)"
-Write-Host "Include:     $includeRx"
-Write-Host "Exclude:     $excludeRx"
+Write-Host "Profile:     $profileName"
+Write-Host "Server:      $serverDisplay (-j=$Jobs)"
+Write-Host "Include:     $(if ($includeRx -ne '') { $includeRx } else { $langProfile.extraction.includeRegex + ' (profile default)' })"
+Write-Host "Exclude:     $(if ($excludeRx -ne '') { $excludeRx } else { $langProfile.extraction.excludeRegex + ' (profile default)' })"
 if ($presetName) { Write-Host "Preset:      $presetName" }
 Write-Host ''
 
 # -- Run Python extraction script --------------------------------
 
-$pyArgs = Build-PyArgs $extractScript $repoRoot $TargetDir $ClangdPath `
+$pyArgs = Build-PyArgs $extractScript $repoRoot $TargetDir $profileName $serverPath `
     $Jobs $Workers $MinFreeRAM $RAMPerWorker `
     $includeRx $excludeRx $Force $SkipRefs $Compress
 

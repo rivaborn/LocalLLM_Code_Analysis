@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """
-serena_extract.py - Direct LSP extraction via clangd
+serena_extract.py - Direct LSP extraction via a language server
 
-Spawns a clangd process, talks LSP JSON-RPC over stdio, and extracts
-symbol overviews + cross-file references for each source file.
-Produces .serena_context.txt files consumed by archgen Pass 1.
+Spawns a language-server process (clangd, lua-language-server, gopls, ...)
+per the selected language profile (llm_profiles/<name>.json), talks LSP
+JSON-RPC over stdio, and extracts symbol overviews + cross-file references
+for each source file. Produces .serena_context.txt files consumed by
+archgen Pass 1.
 
-Zero Claude API calls. Zero tokens. Just local clangd queries.
+Zero Claude API calls. Zero tokens. Just local LSP queries.
 
 Usage:
     python serena_extract.py --repo-root C:/Coding/Epic_Games/UnrealEngine
     python serena_extract.py --repo-root . --target-dir Engine/Source/Runtime/Core
+    python serena_extract.py --repo-root . --profile lua
     python serena_extract.py --repo-root . --file-list files.txt
 """
 
@@ -95,17 +98,80 @@ MAX_REFS_PER_SYMBOL = 20
 REF_TIMEOUT_SECONDS = 10
 
 
-class ClangdClient:
-    """Synchronous LSP client talking to clangd over stdio."""
+# Fallback used when llm_profiles/ is missing entirely (e.g. the script was
+# copied out of the repo). Mirrors llm_profiles/cpp.json - keep in sync.
+_BUILTIN_CPP_PROFILE = {
+    "profile": "cpp",
+    "server": {
+        "command": ["clangd"],
+        "args": ["--compile-commands-dir={repo_root}", "--background-index",
+                 "--pch-storage=disk", "-j={jobs}"],
+        "languageId": "cpp",
+        "languageIdByExt": {},
+        "rootUri": "none",
+        "workspaceFolders": False,
+        "initializationOptions": {},
+        "warmup": {"strategy": "sleep", "seconds": 3},
+        "processNames": ["clangd.exe", "clangd"],
+        "ramPerWorkerGb": 5.0,
+        "restartInterval": 1000,
+        "cleanup": "pch",
+    },
+    "extraction": {
+        "includeRegex": r"\.(cpp|cc|cxx|h|hpp|inl|c)$",
+        "excludeRegex": r"[/\\](\.git|architecture|Binaries|Build|DerivedDataCache|Intermediate|Saved|\.vs|ThirdParty|GeneratedFiles|AutomationTool)([/\\]|$)",
+        "depScan": [r'#\s*include\s+"([^"]+)"'],
+        "depSectionTitle": "Direct Include Dependencies",
+        "commentPrefix": "//",
+        "fence": "cpp",
+    },
+}
 
-    def __init__(self, clangd_path, compile_commands_dir, jobs=2):
-        cmd = [
-            clangd_path,
-            f"--compile-commands-dir={compile_commands_dir}",
-            "--background-index",
-            "--pch-storage=disk",
-            f"-j={jobs}",
-        ]
+
+def load_profile(name, profiles_dir=None):
+    """Load a language profile JSON from llm_profiles/."""
+    if profiles_dir is None:
+        profiles_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "llm_profiles")
+    path = os.path.join(profiles_dir, name.lower() + ".json")
+    if not os.path.isfile(path):
+        if name.lower() == "cpp" and not os.path.isdir(profiles_dir):
+            return _BUILTIN_CPP_PROFILE
+        available = []
+        if os.path.isdir(profiles_dir):
+            available = sorted(os.path.splitext(f)[0]
+                               for f in os.listdir(profiles_dir)
+                               if f.endswith(".json"))
+        sys.exit(f"error: unknown profile '{name}' "
+                 f"(available: {', '.join(available) or 'none'})")
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+class LspClient:
+    """Synchronous LSP client talking to a language server over stdio.
+
+    The server binary, launch args, languageId, rootUri strategy and warmup
+    behavior all come from the language profile.
+    """
+
+    def __init__(self, profile, server_path, repo_root, jobs=2):
+        self.profile = profile
+        self.repo_root = repo_root
+        server = profile["server"]
+        cmd = list(server["command"])
+        cmd += [a.format(repo_root=repo_root, jobs=jobs)
+                for a in server.get("args", [])]
+        if server_path:
+            cmd[0] = server_path
+        # Resolve via PATH (mandatory on Windows for node .cmd shims like
+        # pyright/typescript-language-server); normalize explicit relative
+        # paths so CreateProcess gets a real path.
+        exe = shutil.which(cmd[0])
+        if exe:
+            cmd[0] = exe
+        elif "/" in cmd[0] or os.sep in cmd[0]:
+            cmd[0] = os.path.abspath(cmd[0])
         self.proc = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
@@ -114,6 +180,7 @@ class ClangdClient:
         )
         self._request_id = 0
         self._lock = threading.Lock()
+        self._write_lock = threading.Lock()
         self._pending = {}
         self._notifications = []
 
@@ -169,7 +236,32 @@ class ClangdClient:
                     with self._lock:
                         if rid in self._pending:
                             self._pending[rid].set_result(msg)
+                elif "id" in msg and "method" in msg:
+                    # Server -> client REQUEST. clangd rarely sends these,
+                    # but lua-language-server / gopls / pyright do
+                    # (workspace/configuration, client/registerCapability,
+                    # window/workDoneProgress/create) and will stall waiting
+                    # for an answer if we drop them.
+                    params = msg.get("params") or {}
+                    if msg["method"] == "workspace/configuration":
+                        items = params.get("items") or []
+                        result = [None] * len(items)
+                    else:
+                        result = None
+                    self._respond(msg["id"], result)
                 # Notifications are discarded
+        except Exception:
+            pass
+
+    def _respond(self, msg_id, result):
+        """Answer a server->client request (runs on the reader thread)."""
+        msg = {"jsonrpc": "2.0", "id": msg_id, "result": result}
+        body = json.dumps(msg).encode("utf-8")
+        header = f"Content-Length: {len(body)}\r\n\r\n".encode("ascii")
+        try:
+            with self._write_lock:
+                self.proc.stdin.write(header + body)
+                self.proc.stdin.flush()
         except Exception:
             pass
 
@@ -185,8 +277,9 @@ class ClangdClient:
 
         body = json.dumps(msg).encode("utf-8")
         header = f"Content-Length: {len(body)}\r\n\r\n".encode("ascii")
-        self.proc.stdin.write(header + body)
-        self.proc.stdin.flush()
+        with self._write_lock:
+            self.proc.stdin.write(header + body)
+            self.proc.stdin.flush()
 
         if is_notification:
             return None
@@ -202,7 +295,11 @@ class ClangdClient:
         self._send(method, params, is_notification=True)
 
     def _initialize(self):
-        resp = self.request("initialize", {
+        server = self.profile["server"]
+        root_uri = None
+        if server.get("rootUri") == "repo_root":
+            root_uri = Path(self.repo_root).absolute().as_uri()
+        params = {
             "processId": os.getpid(),
             "capabilities": {
                 "textDocument": {
@@ -210,17 +307,62 @@ class ClangdClient:
                     "references": {},
                 }
             },
-            "rootUri": None,
-        }, timeout=60)
+            "rootUri": root_uri,
+        }
+        if server.get("workspaceFolders") and root_uri:
+            params["workspaceFolders"] = [{
+                "uri": root_uri,
+                "name": os.path.basename(os.path.normpath(str(self.repo_root))) or "workspace",
+            }]
+        init_opts = server.get("initializationOptions") or {}
+        if init_opts:
+            params["initializationOptions"] = init_opts
+        resp = self.request("initialize", params, timeout=60)
         self.notify("initialized", {})
         return resp
 
+    def warmup(self, sample_file=None):
+        """Give the server time to become useful, per the profile strategy.
+
+        - sleep: fixed delay (clangd: let the background index load).
+        - poll_symbols: didOpen a sample file and poll documentSymbol until
+          it returns something (servers that scan the workspace on startup).
+        Optional settleSeconds adds a fixed delay afterwards (e.g. to let a
+        reference index finish after symbols already resolve).
+        """
+        w = self.profile["server"].get("warmup") or {}
+        strategy = w.get("strategy", "sleep")
+        if strategy == "sleep":
+            time.sleep(w.get("seconds", 3))
+        elif strategy == "poll_symbols" and sample_file:
+            deadline = time.time() + w.get("timeoutSeconds", 120)
+            try:
+                content = Path(sample_file).read_text(encoding="utf-8", errors="replace")
+            except Exception:
+                time.sleep(2)
+                content = None
+            if content is not None:
+                uri = self.did_open(sample_file, content)
+                try:
+                    while time.time() < deadline:
+                        if self.document_symbol(uri, timeout=10):
+                            break
+                        time.sleep(1)
+                finally:
+                    self.did_close(uri)
+        settle = w.get("settleSeconds", 0)
+        if settle:
+            time.sleep(settle)
+
     def did_open(self, file_path, content):
         uri = Path(file_path).as_uri()
+        server = self.profile["server"]
+        ext = os.path.splitext(str(file_path))[1].lower()
+        lang_id = (server.get("languageIdByExt") or {}).get(ext) or server["languageId"]
         self.notify("textDocument/didOpen", {
             "textDocument": {
                 "uri": uri,
-                "languageId": "cpp",
+                "languageId": lang_id,
                 "version": 1,
                 "text": content,
             }
@@ -296,7 +438,12 @@ def flatten_symbols(symbols, parent_path=""):
         sel_line = sel_range.get("start", {}).get("line", start_line)
         sel_char = sel_range.get("start", {}).get("character", 0)
 
-        path = f"{parent_path}/{name}" if parent_path else name
+        # Hierarchical DocumentSymbol: parent path from recursion. Flat
+        # SymbolInformation (some servers): use containerName instead.
+        container = parent_path
+        if not container:
+            container = sym.get("containerName") or ""
+        path = f"{container}/{name}" if container else name
 
         result.append({
             "name": name,
@@ -342,7 +489,7 @@ def uri_to_relpath(uri, repo_root):
         return path.replace("\\", "/")
 
 
-def generate_trimmed_source(file_path, symbols, max_lines=800):
+def generate_trimmed_source(file_path, symbols, max_lines=800, comment_prefix="//"):
     """Opt #3: Extract only meaningful code sections using LSP symbol ranges."""
     try:
         all_lines = Path(file_path).read_text(encoding="utf-8", errors="replace").splitlines()
@@ -387,15 +534,15 @@ def generate_trimmed_source(file_path, symbols, max_lines=800):
     last_end = 0
     for start, end in merged:
         if start > last_end:
-            output.append(f"// ... [{start - last_end} lines omitted] ...")
+            output.append(f"{comment_prefix} ... [{start - last_end} lines omitted] ...")
         output.extend(all_lines[start:end])
         last_end = end
         if len(output) >= max_lines:
-            output.append(f"// ... [trimmed at {max_lines} lines, {total - last_end} remaining] ...")
+            output.append(f"{comment_prefix} ... [trimmed at {max_lines} lines, {total - last_end} remaining] ...")
             break
 
     if last_end < total and len(output) < max_lines:
-        output.append(f"// ... [{total - last_end} lines omitted] ...")
+        output.append(f"{comment_prefix} ... [{total - last_end} lines omitted] ...")
 
     return "\n".join(output[:max_lines])
 
@@ -521,21 +668,31 @@ def extract_file(client, file_path, repo_root, skip_refs=False, compress=False, 
             timings["refs_total"] = time.time() - t3
             timings["refs_detail"] = ref_timings
 
-        # For outgoing references, scan the source for #include to identify dependencies
-        includes = re.findall(r'#\s*include\s+"([^"]+)"', content)
+        # For outgoing references, scan the source for import/include
+        # statements per the profile's depScan patterns.
+        extraction = client.profile["extraction"]
+        includes = []
+        for pat in extraction.get("depScan") or []:
+            for m in re.finditer(pat, content, re.MULTILINE):
+                val = next((g for g in m.groups() if g is not None), None)
+                if val is None:
+                    val = m.group(0)
+                includes.append(val)
         if includes:
             lines.append("")
-            lines.append("## Direct Include Dependencies")
+            lines.append(f"## {extraction.get('depSectionTitle', 'Direct Include Dependencies')}")
             for inc in includes[:20]:
                 lines.append(f"- {inc}")
 
         # Opt #3: Generate trimmed source (key sections only)
         t4 = time.time()
-        trimmed = generate_trimmed_source(file_path, symbols)
+        trimmed = generate_trimmed_source(
+            file_path, symbols,
+            comment_prefix=extraction.get("commentPrefix", "//"))
         if trimmed:
             lines.append("")
             lines.append("## Trimmed Source (key sections only)")
-            lines.append("```cpp")
+            lines.append(f"```{extraction.get('fence', 'cpp')}")
             lines.append(trimmed)
             lines.append("```")
         timings["trimmed_source"] = time.time() - t4
@@ -629,36 +786,44 @@ def collect_files(repo_root, target_dir, include_rx, exclude_rx, file_list=None)
 # System memory monitoring
 # ---------------------------------------------------------------------------
 
-def get_clangd_ram_gb():
-    """Get total RAM used by all clangd processes in GB."""
+def get_server_ram_gb(process_names=("clangd.exe", "clangd")):
+    """Get total RAM used by the language-server processes in GB.
+
+    process_names comes from the profile; names ending in .exe are used for
+    the Windows tasklist filter, the others for POSIX ps -C.
+    """
     try:
+        total = 0
         if sys.platform == "win32":
-            result = subprocess.run(
-                ["tasklist", "/FI", "IMAGENAME eq clangd.exe", "/FO", "CSV", "/NH"],
-                capture_output=True, text=True, timeout=5
-            )
-            total = 0
-            # Use csv module to handle commas inside quoted fields
-            # Format: "clangd.exe","PID","Session","#","5,711,560 K"
-            reader = csv.reader(io.StringIO(result.stdout.strip()))
-            for row in reader:
-                if len(row) >= 5:
-                    mem_str = row[4].strip()
-                    # Remove " K" suffix, commas, non-breaking spaces
-                    mem_str = mem_str.replace(" K", "").replace(",", "").replace("\xa0", "").strip()
-                    try:
-                        total += int(mem_str) * 1024  # KB to bytes
-                    except ValueError:
-                        pass
-            return total / (1024 ** 3)
+            for name in process_names:
+                if not name.lower().endswith(".exe"):
+                    continue
+                result = subprocess.run(
+                    ["tasklist", "/FI", f"IMAGENAME eq {name}", "/FO", "CSV", "/NH"],
+                    capture_output=True, text=True, timeout=5
+                )
+                # Use csv module to handle commas inside quoted fields
+                # Format: "clangd.exe","PID","Session","#","5,711,560 K"
+                reader = csv.reader(io.StringIO(result.stdout.strip()))
+                for row in reader:
+                    if len(row) >= 5:
+                        mem_str = row[4].strip()
+                        # Remove " K" suffix, commas, non-breaking spaces
+                        mem_str = mem_str.replace(" K", "").replace(",", "").replace("\xa0", "").strip()
+                        try:
+                            total += int(mem_str) * 1024  # KB to bytes
+                        except ValueError:
+                            pass
         else:
-            # Linux/macOS
-            result = subprocess.run(
-                ["ps", "-C", "clangd", "-o", "rss="],
-                capture_output=True, text=True, timeout=5
-            )
-            total = sum(int(line.strip()) * 1024 for line in result.stdout.strip().splitlines() if line.strip())
-            return total / (1024 ** 3)
+            for name in process_names:
+                if name.lower().endswith(".exe"):
+                    continue
+                result = subprocess.run(
+                    ["ps", "-C", name, "-o", "rss="],
+                    capture_output=True, text=True, timeout=5
+                )
+                total += sum(int(line.strip()) * 1024 for line in result.stdout.strip().splitlines() if line.strip())
+        return total / (1024 ** 3)
     except Exception:
         return 0.0
 
@@ -698,13 +863,15 @@ def get_free_ram_gb():
 # ---------------------------------------------------------------------------
 
 class ExtractionWorker:
-    """A worker thread with its own clangd instance."""
+    """A worker thread with its own language-server instance."""
 
-    def __init__(self, worker_id, clangd_path, repo_root, jobs, work_queue,
+    def __init__(self, worker_id, profile, server_path, repo_root, jobs, work_queue,
                  result_lock, output_dir, hash_db_path, skip_refs, compress,
-                 perf_log, stats, error_log=None, restart_interval=1000):
+                 perf_log, stats, error_log=None, restart_interval=1000,
+                 warmup_sample=None):
         self.worker_id = worker_id
-        self.clangd_path = clangd_path
+        self.profile = profile
+        self.server_path = server_path
         self.repo_root = repo_root
         self.jobs = jobs
         self.work_queue = work_queue
@@ -717,14 +884,15 @@ class ExtractionWorker:
         self.stats = stats  # shared dict: done, fail, empty
         self.error_log = error_log
         self.restart_interval = restart_interval
+        self.warmup_sample = warmup_sample
         self.client = None
         self.thread = None
         self.stop_event = threading.Event()
         self.files_since_restart = 0
 
     def start(self):
-        self.client = ClangdClient(self.clangd_path, self.repo_root, jobs=self.jobs)
-        time.sleep(3)  # Let clangd load index
+        self.client = LspClient(self.profile, self.server_path, self.repo_root, jobs=self.jobs)
+        self.client.warmup(self.warmup_sample)
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
 
@@ -751,16 +919,16 @@ class ExtractionWorker:
         except Exception:
             pass
 
-    def _restart_clangd(self):
+    def _restart_server(self):
         if self.client:
             self.client.shutdown()
         time.sleep(1)
-        self.client = ClangdClient(self.clangd_path, self.repo_root, jobs=self.jobs)
-        time.sleep(3)
+        self.client = LspClient(self.profile, self.server_path, self.repo_root, jobs=self.jobs)
+        self.client.warmup(self.warmup_sample)
         self.files_since_restart = 0
 
-    def _is_clangd_alive(self):
-        """Check if the clangd process is still running."""
+    def _is_server_alive(self):
+        """Check if the language-server process is still running."""
         try:
             return self.client is not None and self.client.proc.poll() is None
         except Exception:
@@ -777,20 +945,20 @@ class ExtractionWorker:
                 self.work_queue.task_done()
                 break
 
-            # Periodic clangd restart
+            # Periodic server restart
             if self.files_since_restart >= self.restart_interval:
-                self._restart_clangd()
+                self._restart_server()
 
-            # Check if clangd crashed — restart before attempting work
-            if not self._is_clangd_alive():
+            # Check if the server crashed — restart before attempting work
+            if not self._is_server_alive():
                 with self.result_lock:
-                    self._log_error(rel, "RESTART", "clangd crashed, restarting")
+                    self._log_error(rel, "RESTART", "language server crashed, restarting")
                 try:
-                    self._restart_clangd()
+                    self._restart_server()
                 except Exception:
                     with self.result_lock:
                         self.stats["fail"] += 1
-                        self._log_error(rel, "FAIL", "clangd restart failed")
+                        self._log_error(rel, "FAIL", "language server restart failed")
                     self.work_queue.task_done()
                     continue
 
@@ -814,14 +982,14 @@ class ExtractionWorker:
                     with self.result_lock:
                         save_hash_entry(self.hash_db_path, sha, rel)
                         self.stats["empty"] += 1
-                        self._log_error(rel, "EMPTY", "No symbols returned by clangd")
+                        self._log_error(rel, "EMPTY", "No symbols returned by language server")
             except OSError as e:
-                # Errno 22 / broken pipe = clangd crashed mid-file
-                # Re-queue the file and restart clangd
+                # Errno 22 / broken pipe = server crashed mid-file
+                # Re-queue the file and restart the server
                 with self.result_lock:
-                    self._log_error(rel, "CRASH", f"clangd pipe broken: {e}, restarting and retrying")
+                    self._log_error(rel, "CRASH", f"server pipe broken: {e}, restarting and retrying")
                 try:
-                    self._restart_clangd()
+                    self._restart_server()
                     # Retry this file once
                     try:
                         context = extract_file(self.client, src, self.repo_root,
@@ -846,7 +1014,7 @@ class ExtractionWorker:
                 except Exception:
                     with self.result_lock:
                         self.stats["fail"] += 1
-                        self._log_error(rel, "FAIL", "clangd restart failed after crash")
+                        self._log_error(rel, "FAIL", "server restart failed after crash")
             except Exception as e:
                 with self.result_lock:
                     self.stats["fail"] += 1
@@ -861,22 +1029,26 @@ class ExtractionWorker:
 # ---------------------------------------------------------------------------
 
 def main():
-    parser = argparse.ArgumentParser(description="Extract LSP context via clangd")
+    parser = argparse.ArgumentParser(description="Extract LSP context via a language server")
     parser.add_argument("--repo-root", required=True, help="Repository root directory")
     parser.add_argument("--target-dir", default=".", help="Subdirectory to scan")
     parser.add_argument("--output-dir", default=None,
                         help="Output directory for .serena_context.txt (default: architecture/.serena_context)")
-    parser.add_argument("--clangd-path", default="clangd", help="Path to clangd binary")
-    parser.add_argument("--jobs", type=int, default=2, help="clangd -j parallelism per instance")
+    parser.add_argument("--profile", default="cpp",
+                        help="Language profile name (llm_profiles/<name>.json; default: cpp)")
+    parser.add_argument("--profiles-dir", default=None,
+                        help="Directory containing profile JSONs (default: <script>/../llm_profiles)")
+    parser.add_argument("--server-path", "--clangd-path", dest="server_path", default=None,
+                        help="Path to the language-server binary (default: the profile's command; "
+                             "--clangd-path is a deprecated alias)")
+    parser.add_argument("--jobs", type=int, default=2, help="Server -j parallelism per instance (clangd only)")
     parser.add_argument("--workers", type=int, default=0,
-                        help="Max parallel clangd instances (0=auto based on free RAM)")
+                        help="Max parallel server instances (0=auto based on free RAM)")
     parser.add_argument("--file-list", default=None, help="File containing list of relative paths")
-    parser.add_argument("--include-rx",
-                        default=r"\.(cpp|cc|cxx|h|hpp|inl|c)$",
-                        help="Include regex for file extensions")
-    parser.add_argument("--exclude-rx",
-                        default=r"[/\\](\.git|architecture|Binaries|Build|DerivedDataCache|Intermediate|Saved|\.vs|ThirdParty|GeneratedFiles|AutomationTool)([/\\]|$)",
-                        help="Exclude regex for directories")
+    parser.add_argument("--include-rx", default=None,
+                        help="Include regex for file extensions (default: from the profile)")
+    parser.add_argument("--exclude-rx", default=None,
+                        help="Exclude regex for directories (default: from the profile)")
     parser.add_argument("--force", action="store_true", help="Re-extract even if context file exists")
     parser.add_argument("--skip-refs", action="store_true",
                         help="Skip reference queries (much faster, symbols only)")
@@ -884,15 +1056,26 @@ def main():
                         help="Compress LSP context: top-15 symbols by ref count, collapse methods")
     parser.add_argument("--min-free-ram", type=float, default=6.0,
                         help="Minimum free RAM in GB to maintain (default: 6)")
-    parser.add_argument("--ram-per-worker", type=float, default=5.0,
-                        help="Estimated RAM per clangd instance in GB (default: 5)")
+    parser.add_argument("--ram-per-worker", type=float, default=None,
+                        help="Estimated RAM per server instance in GB (default: from the profile)")
     args = parser.parse_args()
 
     repo_root = os.path.abspath(args.repo_root)
 
-    # Snapshot existing PCH files so we only clean up ours, and register cleanup
-    _snapshot_pch_baseline()
-    atexit.register(cleanup_pch_files)
+    profile = load_profile(args.profile, args.profiles_dir)
+    server_cfg = profile["server"]
+    include_rx = args.include_rx if args.include_rx is not None else profile["extraction"]["includeRegex"]
+    exclude_rx = args.exclude_rx if args.exclude_rx is not None else profile["extraction"]["excludeRegex"]
+    ram_per_worker = args.ram_per_worker if args.ram_per_worker is not None else float(server_cfg.get("ramPerWorkerGb", 5.0))
+    restart_interval = int(server_cfg.get("restartInterval", 1000))
+    process_names = tuple(server_cfg.get("processNames") or ())
+
+    # Snapshot existing PCH files so we only clean up ours, and register
+    # cleanup (clangd-only: --pch-storage=disk litters temp with preambles).
+    pch_cleanup = server_cfg.get("cleanup") == "pch"
+    if pch_cleanup:
+        _snapshot_pch_baseline()
+        atexit.register(cleanup_pch_files)
 
     output_dir = args.output_dir or os.path.join(repo_root, "architecture", ".serena_context")
     state_dir = os.path.join(output_dir, ".state")
@@ -903,7 +1086,7 @@ def main():
     hash_db = load_hash_db(hash_db_path)
 
     # Collect files
-    files = collect_files(repo_root, args.target_dir, args.include_rx, args.exclude_rx, args.file_list)
+    files = collect_files(repo_root, args.target_dir, include_rx, exclude_rx, args.file_list)
     total = len(files)
     if total == 0:
         print("No matching source files found.")
@@ -926,19 +1109,21 @@ def main():
     # Determine worker count
     free_ram = get_free_ram_gb()
     available = free_ram - args.min_free_ram
-    auto_workers = max(1, int(available / args.ram_per_worker))
+    auto_workers = max(1, int(available / ram_per_worker))
     if args.workers > 0:
         max_workers = args.workers
     else:
         max_workers = auto_workers
 
+    server_display = args.server_path or server_cfg["command"][0]
     print(f"serena_extract.py - Adaptive Parallel LSP Extraction")
     print(f"====================================================")
     print(f"Repo root:    {repo_root}")
     print(f"Target:       {args.target_dir}")
-    print(f"clangd:       {args.clangd_path} (-j={args.jobs})")
+    print(f"Profile:      {profile.get('profile', args.profile)}")
+    print(f"Server:       {server_display} (-j={args.jobs})")
     print(f"Files:        {total} total | skip: {skipped} | process: {len(file_queue)}")
-    print(f"Free RAM:     {free_ram:.1f} GB | reserve: {args.min_free_ram} GB | per-worker: {args.ram_per_worker} GB")
+    print(f"Free RAM:     {free_ram:.1f} GB | reserve: {args.min_free_ram} GB | per-worker: {ram_per_worker} GB")
     print(f"Workers:      {max_workers} max (auto={auto_workers})")
     print(f"Output:       {output_dir}")
     if args.skip_refs:
@@ -963,7 +1148,6 @@ def main():
     RAM_CHECK_INTERVAL = 30         # Check RAM every N files processed
     RAM_SCALE_DOWN_THRESHOLD = 4.0  # GB free — shed a worker below this
     RAM_SCALE_UP_THRESHOLD = 10.0   # GB free — add a worker above this
-    CLANGD_RESTART_INTERVAL = 1000
 
     # Shared state
     work_queue = queue.Queue()
@@ -974,16 +1158,20 @@ def main():
     for rel in file_queue:
         work_queue.put(rel)
 
+    # Sample file for poll_symbols warmups (first queued file).
+    warmup_sample = os.path.join(repo_root, file_queue[0]) if file_queue else None
+
     # Start initial workers
     free_ram = get_free_ram_gb()
-    initial_workers = max(1, min(max_workers, int((free_ram - args.min_free_ram) / args.ram_per_worker)))
+    initial_workers = max(1, min(max_workers, int((free_ram - args.min_free_ram) / ram_per_worker)))
     workers = []
 
     print(f"Starting {initial_workers} worker(s)...")
     for i in range(initial_workers):
         w = ExtractionWorker(
             worker_id=i,
-            clangd_path=args.clangd_path,
+            profile=profile,
+            server_path=args.server_path,
             repo_root=repo_root,
             jobs=args.jobs,
             work_queue=work_queue,
@@ -995,7 +1183,8 @@ def main():
             perf_log=perf_log,
             stats=stats,
             error_log=error_log,
-            restart_interval=CLANGD_RESTART_INTERVAL,
+            restart_interval=restart_interval,
+            warmup_sample=warmup_sample,
         )
         w.start()
         workers.append(w)
@@ -1068,7 +1257,8 @@ def main():
                     new_id = len(workers)
                     w = ExtractionWorker(
                         worker_id=new_id,
-                        clangd_path=args.clangd_path,
+                        profile=profile,
+                        server_path=args.server_path,
                         repo_root=repo_root,
                         jobs=args.jobs,
                         work_queue=work_queue,
@@ -1080,16 +1270,17 @@ def main():
                         perf_log=perf_log,
                         stats=stats,
                         error_log=error_log,
-                        restart_interval=CLANGD_RESTART_INTERVAL,
+                        restart_interval=restart_interval,
+                        warmup_sample=warmup_sample,
                     )
                     w.start()
                     workers.append(w)
                     scale_tag = f"  [scaled up to {active+1}w, {free_ram:.1f}GB free]"
 
-            clangd_ram = get_clangd_ram_gb()
+            server_ram = get_server_ram_gb(process_names)
             line = (f"  {processed}/{len(file_queue)}  done={done} empty={empty} fail={fail}  "
                     f"avg={avg_rate:.1f}/s now={inst_rate:.1f}/s  w={active}  "
-                    f"clangd={clangd_ram:.1f}GB free={free_ram:.1f}GB  eta={eta}{scale_tag}")
+                    f"srv={server_ram:.1f}GB free={free_ram:.1f}GB  eta={eta}{scale_tag}")
             # Pad/truncate to terminal width so line overwrites cleanly
             term_width = shutil.get_terminal_size((120, 24)).columns
             line = line[:term_width - 1].ljust(term_width - 1)
@@ -1102,8 +1293,9 @@ def main():
     for w in workers:
         w.stop()
 
-    # Clean up PCH files left by workers
-    cleanup_pch_files()
+    # Clean up PCH files left by workers (clangd only)
+    if pch_cleanup:
+        cleanup_pch_files()
 
     # Drain any remaining items
     while not work_queue.empty():
