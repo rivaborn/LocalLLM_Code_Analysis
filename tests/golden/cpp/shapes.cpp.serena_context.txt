@@ -1,0 +1,20 @@
+=== LSP CONTEXT FOR: shapes.cpp ===
+
+## Symbol Overview
+### Functions
+- shapes_fixture_version (lines 78-80)
+### Methods
+- fixture/Circle::Circle (lines 5-6)
+- fixture/Circle::area (lines 8-10)
+- fixture/Circle::perimeter (lines 12-14)
+- fixture/Circle::contains (lines 16-18)
+- fixture/Rectangle::Rectangle (lines 20-22)
+- fixture/Rectangle::area (lines 24-26)
+- fixture/Rectangle::perimeter (lines 28-30)
+
+## Incoming References (who calls/uses symbols defined here)
+- shapes_fixture_version:
+  - main.cpp:22
+
+## Direct Include Dependencies
+- shapes.h

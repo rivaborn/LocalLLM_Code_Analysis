@@ -1,0 +1,5 @@
+=== LSP CONTEXT FOR: util.h ===
+
+## Symbol Overview
+### Classes / Structs / Enums
+- Point (Class, lines 9-12)

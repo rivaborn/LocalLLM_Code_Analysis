@@ -1,0 +1,8 @@
+=== LSP CONTEXT FOR: main.cpp ===
+
+## Symbol Overview
+### Functions
+- main (lines 9-28)
+
+## Direct Include Dependencies
+- shapes.h

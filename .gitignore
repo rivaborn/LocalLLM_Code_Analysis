@@ -28,3 +28,8 @@ counter.json
 .vs/
 .DS_Store
 Thumbs.db
+
+# local language-server binaries + machine-specific fixture artifacts
+.tools/
+tests/fixtures/cpp/compile_commands.json
+tests/fixtures/cpp/.cache/

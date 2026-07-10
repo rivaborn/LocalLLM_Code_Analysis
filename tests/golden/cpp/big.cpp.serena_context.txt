@@ -1,0 +1,595 @@
+=== LSP CONTEXT FOR: big.cpp ===
+
+## Symbol Overview
+### Functions
+- helper_000 (lines 23-28)
+- helper_001 (lines 42-47)
+- helper_002 (lines 61-66)
+- helper_003 (lines 80-85)
+- helper_004 (lines 99-104)
+- helper_005 (lines 118-123)
+- helper_006 (lines 137-142)
+- helper_007 (lines 156-161)
+- helper_008 (lines 175-180)
+- helper_009 (lines 194-199)
+- helper_010 (lines 213-218)
+- helper_011 (lines 232-237)
+- helper_012 (lines 251-256)
+- helper_013 (lines 270-275)
+- helper_014 (lines 289-294)
+- helper_015 (lines 308-313)
+- helper_016 (lines 327-332)
+- helper_017 (lines 346-351)
+- helper_018 (lines 365-370)
+- helper_019 (lines 384-389)
+- helper_020 (lines 403-408)
+- helper_021 (lines 422-427)
+- helper_022 (lines 441-446)
+- helper_023 (lines 460-465)
+- helper_024 (lines 479-484)
+- helper_025 (lines 498-503)
+- helper_026 (lines 517-522)
+- helper_027 (lines 536-541)
+- helper_028 (lines 555-560)
+- helper_029 (lines 574-579)
+- helper_030 (lines 593-598)
+- helper_031 (lines 612-617)
+- helper_032 (lines 631-636)
+- helper_033 (lines 650-655)
+- helper_034 (lines 669-674)
+- helper_035 (lines 688-693)
+- helper_036 (lines 707-712)
+- helper_037 (lines 726-731)
+- helper_038 (lines 745-750)
+- helper_039 (lines 764-769)
+- helper_040 (lines 783-788)
+- helper_041 (lines 802-807)
+- helper_042 (lines 821-826)
+- helper_043 (lines 840-845)
+- helper_044 (lines 859-864)
+- helper_045 (lines 878-883)
+- helper_046 (lines 897-902)
+- helper_047 (lines 916-921)
+- helper_048 (lines 935-940)
+- helper_049 (lines 954-959)
+- helper_050 (lines 973-978)
+- helper_051 (lines 992-997)
+- helper_052 (lines 1011-1016)
+- helper_053 (lines 1030-1035)
+- helper_054 (lines 1049-1054)
+- helper_055 (lines 1068-1073)
+- helper_056 (lines 1087-1092)
+- helper_057 (lines 1106-1111)
+- helper_058 (lines 1125-1130)
+- helper_059 (lines 1144-1149)
+- helper_widebody (lines 1151-1184)
+
+## Direct Include Dependencies
+- util.h
+
+## Trimmed Source (key sections only)
+```cpp
+// Large generated fixture file: exceeds the 800-line threshold so
+// generate_trimmed_source() emits a Trimmed Source section in the
+// golden output. The 6-line comment gaps between functions defeat
+// the region merge (-2 buffer) so omission markers appear, and
+// helper_widebody() is >25 lines to exercise head/tail truncation.
+// Static content; do not regenerate - the golden extraction
+// depends on exact line numbers.
+
+#include "util.h"
+
+// filler 000.0: prose between functions, outside any symbol
+//   region, so the trimmer omits it and emits a gap marker.
+// filler 000.1: prose between functions, outside any symbol
+//   (more filler so the gap is comfortably wider than the merge buffer)
+// filler 000.2: prose between functions, outside any symbol
+//   (more filler so the gap is comfortably wider than the merge buffer)
+// filler 000.3: prose between functions, outside any symbol
+//   (more filler so the gap is comfortably wider than the merge buffer)
+// filler 000.4: prose between functions, outside any symbol
+//   (more filler so the gap is comfortably wider than the merge buffer)
+// filler 000.5: prose between functions, outside any symbol
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_000(double a, double b) {
+    double t = a * 1.0;
+    t += b / 2.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+
+// filler 001.0: prose between functions, outside any symbol
+// ... [10 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_001(double a, double b) {
+    double t = a * 2.0;
+    t += b / 3.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_002(double a, double b) {
+    double t = a * 3.0;
+    t += b / 4.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_003(double a, double b) {
+    double t = a * 4.0;
+    t += b / 5.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_004(double a, double b) {
+    double t = a * 5.0;
+    t += b / 6.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_005(double a, double b) {
+    double t = a * 6.0;
+    t += b / 7.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_006(double a, double b) {
+    double t = a * 7.0;
+    t += b / 8.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_007(double a, double b) {
+    double t = a * 8.0;
+    t += b / 9.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_008(double a, double b) {
+    double t = a * 9.0;
+    t += b / 10.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_009(double a, double b) {
+    double t = a * 10.0;
+    t += b / 11.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_010(double a, double b) {
+    double t = a * 11.0;
+    t += b / 12.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_011(double a, double b) {
+    double t = a * 12.0;
+    t += b / 13.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_012(double a, double b) {
+    double t = a * 13.0;
+    t += b / 14.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_013(double a, double b) {
+    double t = a * 14.0;
+    t += b / 15.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_014(double a, double b) {
+    double t = a * 15.0;
+    t += b / 16.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_015(double a, double b) {
+    double t = a * 16.0;
+    t += b / 17.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_016(double a, double b) {
+    double t = a * 17.0;
+    t += b / 18.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_017(double a, double b) {
+    double t = a * 18.0;
+    t += b / 19.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_018(double a, double b) {
+    double t = a * 19.0;
+    t += b / 20.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_019(double a, double b) {
+    double t = a * 20.0;
+    t += b / 21.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_020(double a, double b) {
+    double t = a * 21.0;
+    t += b / 22.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_021(double a, double b) {
+    double t = a * 22.0;
+    t += b / 23.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_022(double a, double b) {
+    double t = a * 23.0;
+    t += b / 24.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_023(double a, double b) {
+    double t = a * 24.0;
+    t += b / 25.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_024(double a, double b) {
+    double t = a * 25.0;
+    t += b / 26.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_025(double a, double b) {
+    double t = a * 26.0;
+    t += b / 27.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_026(double a, double b) {
+    double t = a * 27.0;
+    t += b / 28.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_027(double a, double b) {
+    double t = a * 28.0;
+    t += b / 29.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_028(double a, double b) {
+    double t = a * 29.0;
+    t += b / 30.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_029(double a, double b) {
+    double t = a * 30.0;
+    t += b / 31.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_030(double a, double b) {
+    double t = a * 31.0;
+    t += b / 32.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_031(double a, double b) {
+    double t = a * 32.0;
+    t += b / 33.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_032(double a, double b) {
+    double t = a * 33.0;
+    t += b / 34.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_033(double a, double b) {
+    double t = a * 34.0;
+    t += b / 35.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_034(double a, double b) {
+    double t = a * 35.0;
+    t += b / 36.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_035(double a, double b) {
+    double t = a * 36.0;
+    t += b / 37.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_036(double a, double b) {
+    double t = a * 37.0;
+    t += b / 38.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_037(double a, double b) {
+    double t = a * 38.0;
+    t += b / 39.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_038(double a, double b) {
+    double t = a * 39.0;
+    t += b / 40.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_039(double a, double b) {
+    double t = a * 40.0;
+    t += b / 41.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_040(double a, double b) {
+    double t = a * 41.0;
+    t += b / 42.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_041(double a, double b) {
+    double t = a * 42.0;
+    t += b / 43.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_042(double a, double b) {
+    double t = a * 43.0;
+    t += b / 44.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_043(double a, double b) {
+    double t = a * 44.0;
+    t += b / 45.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_044(double a, double b) {
+    double t = a * 45.0;
+    t += b / 46.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_045(double a, double b) {
+    double t = a * 46.0;
+    t += b / 47.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_046(double a, double b) {
+    double t = a * 47.0;
+    t += b / 48.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_047(double a, double b) {
+    double t = a * 48.0;
+    t += b / 49.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_048(double a, double b) {
+    double t = a * 49.0;
+    t += b / 50.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_049(double a, double b) {
+    double t = a * 50.0;
+    t += b / 51.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_050(double a, double b) {
+    double t = a * 51.0;
+    t += b / 52.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_051(double a, double b) {
+    double t = a * 52.0;
+    t += b / 53.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_052(double a, double b) {
+    double t = a * 53.0;
+    t += b / 54.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_053(double a, double b) {
+    double t = a * 54.0;
+    t += b / 55.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_054(double a, double b) {
+    double t = a * 55.0;
+    t += b / 56.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_055(double a, double b) {
+    double t = a * 56.0;
+    t += b / 57.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_056(double a, double b) {
+    double t = a * 57.0;
+    t += b / 58.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_057(double a, double b) {
+    double t = a * 58.0;
+    t += b / 59.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_058(double a, double b) {
+    double t = a * 59.0;
+    t += b / 60.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+// ... [12 lines omitted] ...
+//   (more filler so the gap is comfortably wider than the merge buffer)
+double helper_059(double a, double b) {
+    double t = a * 60.0;
+    t += b / 61.0;
+    t -= fixture::square(a - b);
+    return t;
+}
+
+double helper_widebody(double a, double b) {
+    double s = 0.0;
+    s += helper_000(a, b);
+    s += helper_002(a, b);
+    s += helper_004(a, b);
+    s += helper_006(a, b);
+    s += helper_008(a, b);
+    s += helper_010(a, b);
+    s += helper_012(a, b);
+    s += helper_014(a, b);
+    s += helper_016(a, b);
+    s += helper_018(a, b);
+    s += helper_020(a, b);
+    s += helper_022(a, b);
+// ... [15 lines omitted] ...
+    s += helper_054(a, b);
+    s += helper_056(a, b);
+    s += helper_058(a, b);
+    return s;
+}
+```

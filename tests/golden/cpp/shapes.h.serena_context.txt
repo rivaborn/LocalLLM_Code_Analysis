@@ -1,0 +1,39 @@
+=== LSP CONTEXT FOR: shapes.h ===
+
+## Symbol Overview
+### Classes / Structs / Enums
+- ShapeKind (Enum, lines 7-11)
+- kCircle (Enum, lines 8-8)
+- kRectangle (Enum, lines 9-9)
+- kTriangle (Enum, lines 10-10)
+- Shape (Class, lines 13-24)
+- Circle (Class, lines 26-37)
+- Rectangle (Class, lines 39-50)
+- ShapeCounter (Class, lines 63-71)
+### Functions
+- shapes_fixture_version (lines 61-61)
+### Methods
+- fixture/Shape/Shape (lines 15-15)
+- fixture/Shape/~Shape (lines 16-16)
+- fixture/Shape/kind (lines 18-18)
+- fixture/Shape/area (lines 19-19)
+- fixture/Shape/perimeter (lines 20-20)
+- fixture/Circle/Circle (lines 28-28)
+- fixture/Circle/area (lines 30-30)
+- fixture/Circle/perimeter (lines 31-31)
+- fixture/Circle/contains (lines 32-32)
+- fixture/Rectangle/Rectangle (lines 41-41)
+- fixture/Rectangle/area (lines 43-43)
+- fixture/Rectangle/perimeter (lines 44-44)
+- ShapeCounter/ShapeCounter (lines 65-65)
+- ShapeCounter/add (lines 66-66)
+- ShapeCounter/count (lines 67-67)
+
+## Incoming References (who calls/uses symbols defined here)
+- shapes_fixture_version:
+  - main.cpp:22
+- ShapeCounter:
+  - main.cpp:19
+
+## Direct Include Dependencies
+- util.h
