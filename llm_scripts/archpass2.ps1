@@ -848,6 +848,7 @@ foreach ($rel in $queue) {
             Remove-Job $j
             $running.Remove($j) | Out-Null
         }
+        foreach ($j in $running) { Receive-LiveJobOutput $j }
         if ($running.Count -ge $jobCount) {
             $c = Read-Counter $counterPath
             if ($c) {
@@ -902,6 +903,7 @@ while ($running.Count -gt 0) {
         Remove-Job $j
         $running.Remove($j) | Out-Null
     }
+    foreach ($j in $running) { Receive-LiveJobOutput $j }
     if ($running.Count -gt 0) {
         $c = Read-Counter $counterPath
         if ($c) {

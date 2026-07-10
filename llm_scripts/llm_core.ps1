@@ -86,6 +86,30 @@ function Set-GpuGateEnv {
     }
 }
 
+function Receive-LiveJobOutput {
+    # Relay a still-running Start-Job worker's pending stream records (the
+    # [gpu-idle] waits and [retry] notices it Write-Hosts) to the console as
+    # they happen. Without this the parent only Receive-Jobs on completion, so
+    # a run blocked on its very first file shows no output at all. Workers
+    # return results via files, never the pipeline, so consuming the streams
+    # mid-run loses nothing.
+    param($Job)
+    $cj = if ($Job.ChildJobs.Count -gt 0) { $Job.ChildJobs[0] } else { $Job }
+    $total = $cj.Output.Count + $cj.Information.Count + $cj.Error.Count +
+             $cj.Warning.Count + $cj.Verbose.Count
+    if ($null -eq $script:liveJobSeen) { $script:liveJobSeen = @{} }
+    $seen = $script:liveJobSeen[$Job.Id]
+    if ($null -eq $seen) { $seen = 0 }
+    if ($total -gt $seen) {
+        Write-Host ''   # drop off the `r-rewritten progress line first
+        Receive-Job $Job -ErrorAction SilentlyContinue | Out-Null
+        # Receive-Job prints only new records but does NOT reset the stream
+        # counts on PS 5.1 - remember how many we've relayed, or every later
+        # poll tick re-triggers and spews a blank line.
+        $script:liveJobSeen[$Job.Id] = $total
+    }
+}
+
 function Wait-GpuIdle {
     # GPU idle gate: before touching the local backend, ask the LLMConfig
     # gateway whether the primary GPU (RTX 3090 lane) is busy - a model swap

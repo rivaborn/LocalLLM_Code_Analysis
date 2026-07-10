@@ -1652,6 +1652,7 @@ foreach ($item in $dispatchQueue) {
                 Receive-Job $r.Job -ErrorAction SilentlyContinue | Out-Null
                 Remove-Job  $r.Job -ErrorAction SilentlyContinue
             } else {
+                Receive-LiveJobOutput $r.Job
                 $next.Add($r)
             }
         }
@@ -1734,6 +1735,7 @@ while ($running.Count -gt 0) {
             Receive-Job $item.Job -ErrorAction SilentlyContinue | Out-Null
             Remove-Job  $item.Job -ErrorAction SilentlyContinue
         } else {
+            Receive-LiveJobOutput $item.Job
             $next.Add($item)
         }
     }
