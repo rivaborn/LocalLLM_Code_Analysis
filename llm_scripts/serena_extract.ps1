@@ -332,8 +332,11 @@ $presetName = if ($Preset -ne '') { $Preset } else { Cfg 'PRESET' '' }
 $presetData = Get-Preset $presetName
 
 # Profile precedence: -LangProfile > preset's Profile > .env PROFILE > cpp.
+# NB: the local must NOT be named $langProfile - PowerShell variables are
+# case-insensitive and the [string]-typed $LangProfile param would coerce
+# the profile object to its type name.
 $profileName = if ($LangProfile -ne '') { $LangProfile } else { Resolve-ProfileName $presetData (Cfg 'PROFILE' '') }
-$langProfile = Get-LangProfile $profileName
+$profileObj = Get-LangProfile $profileName
 
 # Regex precedence: .env override > named preset > the profile's own
 # defaults (passed as '' so Build-PyArgs omits the flag and the Python
@@ -354,7 +357,7 @@ try {
 # -- Verify prerequisites (per language profile) -------------------
 
 $prereqs = @()
-if ($null -ne $langProfile.server.prereqs) { $prereqs = @($langProfile.server.prereqs) }
+if ($null -ne $profileObj.server.prereqs) { $prereqs = @($profileObj.server.prereqs) }
 foreach ($pr in $prereqs) {
     $target = Join-Path $repoRoot $pr.path
     if (-not (Test-Path $target)) {
@@ -376,7 +379,7 @@ if (-not (Test-Path $extractScript)) {
 
 # -- Banner ----------------------------------------------------
 
-$serverDisplay = if ($serverPath -ne '') { $serverPath } else { @($langProfile.server.command)[0] }
+$serverDisplay = if ($serverPath -ne '') { $serverPath } else { @($profileObj.server.command)[0] }
 Write-Host '============================================' -ForegroundColor Yellow
 Write-Host '  serena_extract.ps1 - LSP Context Extract' -ForegroundColor Yellow
 Write-Host '============================================' -ForegroundColor Yellow
@@ -384,8 +387,8 @@ Write-Host "Repo root:   $repoRoot"
 Write-Host "Target:      $TargetDir"
 Write-Host "Profile:     $profileName"
 Write-Host "Server:      $serverDisplay (-j=$Jobs)"
-Write-Host "Include:     $(if ($includeRx -ne '') { $includeRx } else { $langProfile.extraction.includeRegex + ' (profile default)' })"
-Write-Host "Exclude:     $(if ($excludeRx -ne '') { $excludeRx } else { $langProfile.extraction.excludeRegex + ' (profile default)' })"
+Write-Host "Include:     $(if ($includeRx -ne '') { $includeRx } else { $profileObj.extraction.includeRegex + ' (profile default)' })"
+Write-Host "Exclude:     $(if ($excludeRx -ne '') { $excludeRx } else { $profileObj.extraction.excludeRegex + ' (profile default)' })"
 if ($presetName) { Write-Host "Preset:      $presetName" }
 Write-Host ''
 

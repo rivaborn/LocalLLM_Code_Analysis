@@ -35,3 +35,4 @@ tests/fixtures/cpp/compile_commands.json
 tests/fixtures/cpp/.cache/
 tests/fixtures/ts/node_modules/
 tests/fixtures/ts/package-lock.json
+__pycache__/
