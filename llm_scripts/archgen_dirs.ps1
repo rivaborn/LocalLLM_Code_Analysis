@@ -327,6 +327,7 @@ $excludeRx  = Cfg 'EXCLUDE_DIRS_REGEX' $dirDefaultExclude
 # -- Local LLM backend (LLMConfig) -----------------------------
 . (Join-Path $PSScriptRoot 'llm_core.ps1')
 $llmBackend   = Get-LLMBackend -Cfg $script:cfg
+Set-GpuGateEnv -Cfg $script:cfg   # GPU idle gate config -> env
 $llmEndpoint  = ''
 $llmModel     = ''
 $llmTemp      = [double](Cfg 'LLM_TEMPERATURE' '0.1')

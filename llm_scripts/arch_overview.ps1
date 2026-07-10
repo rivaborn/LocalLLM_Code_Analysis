@@ -721,6 +721,7 @@ $chunkThreshold = [int](Cfg $cfg 'CHUNK_THRESHOLD' '1500')
 # -- Local LLM backend (LLMConfig) -----------------------------
 . (Join-Path $PSScriptRoot 'llm_core.ps1')
 $llmBackend   = Get-LLMBackend -Cfg $cfg
+Set-GpuGateEnv -Cfg $cfg   # GPU idle gate config -> env
 $llmEndpoint  = ''
 $llmModel     = ''
 $llmTemp      = [double](Cfg $cfg 'LLM_TEMPERATURE' '0.1')

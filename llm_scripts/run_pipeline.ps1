@@ -305,6 +305,15 @@ function Invoke-ModelPreload($Model) {
     $gwPort = Get-EnvVal 'LLM_GATEWAY_PORT'; if (-not $gwPort) { $gwPort = '11430' }
     $uri  = "http://${gwHost}:${gwPort}/api/load"
     $body = @{ server = 'ollama'; model = $Model } | ConvertTo-Json -Compress
+    # GPU idle gate: loading would evict whatever is resident, so wait until
+    # the card is idle before taking it over (Wait-GpuIdle from llm_core.ps1;
+    # export its .env keys first since this script uses Get-EnvVal, not Cfg).
+    . (Join-Path $PSScriptRoot 'llm_core.ps1')
+    foreach ($k in @('GPU_IDLE_CHECK', 'GPU_BUSY_THRESHOLD', 'GPU_CHECK_INTERVAL', 'GPU_STATUS_URL')) {
+        $v = Get-EnvVal $k
+        if ($v) { Set-Item -Path "env:$k" -Value $v }
+    }
+    Wait-GpuIdle -Endpoint "http://${gwHost}:${gwPort}"
     Write-Host ""
     Write-Host "===== PRE-FLIGHT: load '$Model' on GPU via gateway ($uri) =====" -ForegroundColor Cyan
     try {

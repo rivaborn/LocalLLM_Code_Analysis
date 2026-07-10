@@ -75,6 +75,78 @@ function Get-LLMModel {
     return $Fallback
 }
 
+function Set-GpuGateEnv {
+    # Copy the GPU idle-gate keys from parsed .env into process env vars so
+    # Start-Job workers (separate processes that don't read .env) inherit them.
+    # Call once from each parent script after Read-EnvFile.
+    param([hashtable]$Cfg)
+    foreach ($k in @('GPU_IDLE_CHECK', 'GPU_BUSY_THRESHOLD', 'GPU_CHECK_INTERVAL', 'GPU_STATUS_URL')) {
+        $v = Get-LLMCfgVal $Cfg $k ''
+        if ($v -ne '') { Set-Item -Path "env:$k" -Value $v }
+    }
+}
+
+function Wait-GpuIdle {
+    # GPU idle gate: before touching the local backend, ask the LLMConfig
+    # gateway whether the primary GPU (RTX 3090 lane) is busy - a model swap
+    # in progress, an active gateway job, or utilization above threshold -
+    # and if so wait GPU_CHECK_INTERVAL seconds (default 300) and re-check
+    # until it is idle. Applies only to local backends (claude never calls
+    # this). An unreachable gateway does NOT block: we return and let the
+    # actual LLM call surface the error.
+    #
+    # .env / env keys (exported to workers via Set-GpuGateEnv):
+    #   GPU_IDLE_CHECK     1 (default) = on, 0 = off
+    #   GPU_BUSY_THRESHOLD utilization % that counts as busy (default 10)
+    #   GPU_CHECK_INTERVAL seconds between re-checks (default 300)
+    #   GPU_STATUS_URL     override; default http://<endpoint-host>:11430/api/status
+    param([string]$Endpoint)
+    if ($env:GPU_IDLE_CHECK -eq '0') { return }
+    if (-not $Endpoint -or $Endpoint -eq '') { return }
+    $m = [regex]::Match($Endpoint, '^(https?)://([^:/]+)')
+    if (-not $m.Success) { return }
+    $statusUrl = if ($env:GPU_STATUS_URL) { $env:GPU_STATUS_URL }
+                 else { "$($m.Groups[1].Value)://$($m.Groups[2].Value):$($script:LLM_GATEWAY_PORT)/api/status" }
+    $threshold = 10.0
+    if ($env:GPU_BUSY_THRESHOLD) { $threshold = [double]$env:GPU_BUSY_THRESHOLD }
+    $interval = 300
+    if ($env:GPU_CHECK_INTERVAL) { $interval = [int]$env:GPU_CHECK_INTERVAL }
+
+    $waited = $false
+    while ($true) {
+        $st = $null
+        try {
+            $st = Invoke-RestMethod -Uri $statusUrl -TimeoutSec 10 -ErrorAction Stop
+        } catch {
+            if ($waited) { Write-Host "[gpu-idle] status endpoint unreachable - proceeding" -ForegroundColor Yellow }
+            return
+        }
+        # Prefer the primary lane (the 3090) when the gateway reports lanes.
+        $g = $st
+        if (($st.PSObject.Properties.Name -contains 'lanes') -and @($st.lanes).Count -gt 0) {
+            $g = @($st.lanes)[0]
+        }
+        $busy = $false
+        $reason = ''
+        $util = 0.0
+        try { $util = [double]$g.gpu.utilization_pct } catch {}
+        if ($g.swap_in_progress) {
+            $busy = $true; $reason = 'model swap in progress'
+        } elseif (($g.PSObject.Properties.Name -contains 'active_job_id') -and $null -ne $g.active_job_id -and "$($g.active_job_id)" -ne '') {
+            $busy = $true; $reason = "gateway job $($g.active_job_id) active"
+        } elseif ($util -ge $threshold) {
+            $busy = $true; $reason = ('GPU at {0:N0}% utilization (threshold {1:N0}%)' -f $util, $threshold)
+        }
+        if (-not $busy) {
+            if ($waited) { Write-Host "[gpu-idle] GPU idle again - resuming" -ForegroundColor Green }
+            return
+        }
+        Write-Host ("[gpu-idle] {0:HH:mm:ss} RTX busy: {1} - waiting {2}s" -f (Get-Date), $reason, $interval) -ForegroundColor Yellow
+        $waited = $true
+        Start-Sleep -Seconds $interval
+    }
+}
+
 function Invoke-LocalLLM {
     # Single completion against the local backend. Returns the trimmed response
     # text, or throws after $MaxRetries. The caller supplies the resolved
@@ -101,6 +173,9 @@ function Invoke-LocalLLM {
         $Endpoint = Get-LLMEndpoint -Backend $Backend
     }
     $Endpoint = $Endpoint.TrimEnd('/')
+
+    # Yield to other GPU users: only fire this request when the card is idle.
+    Wait-GpuIdle -Endpoint $Endpoint
 
     # Thinking models emit reasoning AND content from the same num_predict budget;
     # too small a budget returns empty content. Floor it ONLY on the ollama native

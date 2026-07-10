@@ -87,6 +87,7 @@ The workflow is **one subsystem at a time**: analyze, then rename `architecture/
 - `.env` has `CLAUDE_MODEL=haiku` with `TIERED_MODEL=1` (auto-upgrades complex files to sonnet)
 - `CLAUDE1_CONFIG_DIR` and `CLAUDE2_CONFIG_DIR` for dual-account rate-limit rotation
 - `-Clean` on archgen.ps1 preserves `.serena_context/`, `.dir_context/`, `.dir_headers/`
+- **GPU idle gate** (`Wait-GpuIdle` in llm_core.ps1, on by default): every local-LLM call and the run_pipeline pre-flight load first poll the gateway's `/api/status`; if the primary GPU lane is busy (model swap, active gateway job, or utilization >= `GPU_BUSY_THRESHOLD`, default 10%) the call waits `GPU_CHECK_INTERVAL` s (default 300) and re-checks until idle. Keys: `GPU_IDLE_CHECK`/`GPU_BUSY_THRESHOLD`/`GPU_CHECK_INTERVAL`/`GPU_STATUS_URL` — exported to Start-Job workers via `Set-GpuGateEnv`. Unreachable status endpoint never blocks. Note the pipeline's own generation drops utilization to ~0 between sequential calls, so self-gating does not trigger; an active gateway job DOES gate (including our own pre-flight load — by design, that wait is the load completing).
 
 ## Language profiles (multi-language support)
 

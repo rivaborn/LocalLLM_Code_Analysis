@@ -468,6 +468,7 @@ $dataBlobFrac     = [double](Cfg $cfg 'DATA_BLOB_FRACTION' '0.6')
 # -- Local LLM backend (LLMConfig) -----------------------------
 . (Join-Path $PSScriptRoot 'llm_core.ps1')
 $llmBackend   = Get-LLMBackend -Cfg $cfg
+Set-GpuGateEnv -Cfg $cfg   # GPU idle gate config -> env (inherited by workers)
 $llmEndpoint  = ''
 $llmModel     = ''
 $llmTemp      = [double](Cfg $cfg 'LLM_TEMPERATURE' '0.1')

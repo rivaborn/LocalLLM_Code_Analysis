@@ -143,6 +143,7 @@ $useClassify     = if ($Classify -ne '') { '1' } else { Cfg 'CLASSIFY_FILES' '0'
 # the legacy `claude` CLI path. See llm_core.ps1 + the LLM_* keys in .env.
 . (Join-Path $PSScriptRoot 'llm_core.ps1')
 $llmBackend   = Get-LLMBackend -Cfg $cfg
+Set-GpuGateEnv -Cfg $cfg   # GPU idle gate config -> env (inherited by workers)
 $llmEndpoint  = ''
 $llmModel     = ''
 $llmTemp      = [double](Cfg 'LLM_TEMPERATURE' '0.1')
