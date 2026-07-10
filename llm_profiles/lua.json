@@ -13,7 +13,7 @@
     "warmup": { "strategy": "poll_symbols", "timeoutSeconds": 120, "settleSeconds": 20 },
     "processNames": ["lua-language-server.exe", "lua-language-server"],
     "ramPerWorkerGb": 1.5,
-    "restartInterval": 2000,
+    "restartInterval": 150,
     "needsCompileDb": false,
     "prereqs": [
       {
