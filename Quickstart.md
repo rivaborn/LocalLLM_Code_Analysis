@@ -1,6 +1,6 @@
 # Architecture Analysis Toolkit — Quickstart
 
-Generate architecture documentation for C++ game engine codebases using a local LLM (or the Claude CLI) + clangd LSP.
+Generate architecture documentation for large codebases using a local LLM (or the Claude CLI) + LSP semantic extraction. Multi-language via profiles in `llm_profiles\` — C/C++ (clangd), Lua (lua-language-server), Python (jedi), TypeScript/JS, Go (gopls); the preset picks the profile (`-Preset koreader` → lua), or set `.env PROFILE` for bare runs. See README "Language profiles" for server installs.
 
 Scripts live in `llm_scripts/`; run them from the codebase root as `.\llm_scripts\<name>.ps1`.
 

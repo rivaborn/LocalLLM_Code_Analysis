@@ -88,6 +88,17 @@ The workflow is **one subsystem at a time**: analyze, then rename `architecture/
 - `CLAUDE1_CONFIG_DIR` and `CLAUDE2_CONFIG_DIR` for dual-account rate-limit rotation
 - `-Clean` on archgen.ps1 preserves `.serena_context/`, `.dir_context/`, `.dir_headers/`
 
+## Language profiles (multi-language support)
+
+Extraction + doc-gen are language-agnostic via **profiles** in `llm_profiles\{cpp,lua,python,typescript,go}.json`, read by BOTH the PowerShell layer (`preset_core.ps1: Get-LangProfile`) and `serena_extract.py` (`load_profile`). A profile describes: LSP server command/args (`{repo_root}`/`{jobs}` placeholders; binary resolved via `shutil.which` — required for node `.cmd` shims), languageId (+ per-extension map), rootUri strategy (`none` = clangd's legacy null — do NOT "fix"), workspaceFolders, warmup (`sleep` for clangd's index vs `poll_symbols` for servers that scan the workspace on startup; optional `settleSeconds`), prereq checks (severity `warn`/`error` + hint), dep-scan regex LIST + section title, comment prefix + fence, `processNames` for the RAM gauge, `ramPerWorkerGb`, `restartInterval`, `cleanup` (`"pch"` = clangd-only temp cleanup), and doc-gen knobs (trivialPatterns, blobCommentPrefixes, importBundling/inheritanceRegex — null disables header bundling / pattern cache for that language).
+
+- **Preset vs profile**: preset = codebase-level (`unreal`, `koreader`, ...; single `Get-Preset` in `preset_core.ps1` — the old duplicated copies are gone) and carries `Profile` + `PreambleFile`. Presets keep SEPARATE extraction (`LspInclude/LspExclude`) vs doc-gen (`Include/Exclude`) regexes (unreal: archgen documents `.cs`, clangd can't parse it). Precedence: `-LangProfile` > preset's `Profile` > `.env PROFILE` > `cpp`.
+- New-preset excludes anchor `(^|[/\\])...` because `collect_files` matches RELATIVE paths — the legacy `[/\\]...` patterns never match repo-root-level dirs (kept verbatim for cpp presets; the golden gate depends on it).
+- **Regression gate**: `tests\run_golden_gate.ps1` re-extracts `tests\fixtures\cpp` (self-contained; global-scope symbols so reference queries fire; an 1185-line file for trimmed-source markers) and byte-diffs against committed `tests\golden\cpp\`. Run it after ANY change to `serena_extract.py` / `preset_core.ps1`. clangd + lua-language-server binaries live in gitignored `.tools\`.
+- Smoke targets: `tests\fixtures\{py,ts,go}` (+ `llm_scripts\*.py` for python). The ts fixture needs `npm install` once (workspace typescript). Go smoke needs a Go toolchain (`go install golang.org/x/tools/gopls@latest`).
+- `SERENA_LSP_DEBUG=1` lets the server's stderr through (otherwise DEVNULL — startup failures look like "0 symbols").
+- Workers launch + warm up their server IN PARALLEL inside the worker thread (serial warmup used to cost workers × workspace-scan time for poll_symbols servers).
+
 ## Local LLM backend (LLMConfig)
 
 The LLM-driven stages can run against the homelab **LLMConfig** box instead of the `claude` CLI. The backend is selected by `LLM_BACKEND` in `.env`:
@@ -107,6 +118,15 @@ Implementation: `llm_core.ps1` (`Get-LLMBackend` / `Get-LLMEndpoint` / `Get-LLMM
 **Data-blob detector -- skip giant generated literal tables.** Some headers are precomputed lookup/data tables (e.g. `GlintShadingLUTsData.h`, `LTC.h` -- thousands of hardcoded hex/numeric literals). They have no architecture to document, drive a thinking model to empty output (it exhausts `num_predict` inside `<thinking>`), and overflow even the `DEGRADE_FALLBACK_MODEL` (too big for sonnet's context), so they otherwise fail after wasted retries + a doomed escalation. Both `archgen.ps1` (Pass 1) and `archpass2.ps1` (Pass 2) pre-scan for these in the queue-build step: a file `>= DATA_BLOB_MIN_LINES` (default 2000) whose non-comment lines are `>= DATA_BLOB_FRACTION` (default 0.6) pure numeric/hex literals is **stubbed** like a trivial file instead of being sent to the LLM. Identifiers/keywords never match the literal regex, so real code is not flagged (`GlintShadingLUTsData.h` 0.999 -> blob; `RHI.cpp` 0.003 -> not). Knobs are backend-agnostic and default-on: `DETECT_DATA_BLOB=1`, `DATA_BLOB_MIN_LINES=2000`, `DATA_BLOB_FRACTION=0.6`. Each skip is counted (shown in the pre-run "Files:" line and an end-of-run summary) and appended to `<state>/datablob.tsv`; `run_pipeline.ps1` clears + aggregates both passes' ledgers (`.archgen_state` + `.pass2_state`) and lists them in a **"Data-blob skips"** section of `Run Report.md`.
 
 ## Known Issues and Bugs
+
+### PowerShell case-insensitive param collision (FIXED, watch for recurrence)
+`$langProfile = Get-LangProfile ...` silently coerced the profile OBJECT to a string because the script has a `[string]$LangProfile` PARAMETER — PowerShell variables are case-insensitive and type-constrained params coerce on assignment. Locals near typed params must use distinct names (`$profileObj`).
+
+### LSP server->client requests were dropped (FIXED)
+`_read_loop` only dispatched responses; server->client REQUESTS (`workspace/configuration`, `client/registerCapability`, `window/workDoneProgress/create`) were discarded. clangd tolerates it; lua-language-server/gopls/pyright stall waiting for the reply. A generic responder now answers them (plus a stdin write lock — responses come from the reader thread).
+
+### typescript-language-server: workspace typescript required
+`initialize` FAILS ("Could not find a valid TypeScript installation") when the target repo has no `node_modules/typescript` — global npm installs are not searched — and the server then answers every documentSymbol with `[]` (files land in the EMPTY bucket with no error). Encoded as an error-severity prereq in `llm_profiles\typescript.json`; fix is `npm install typescript` at the target root.
 
 ### archgen_worker.ps1 — Files not written to disk (FIXED)
 Root cause: PowerShell 5.1 `if/else` expression unwraps single-element arrays to scalars. The line `$relList = if ($isBatch) { $rel -split '\|' } else { @($rel) }` returned a string instead of an array for individual (non-batch) files. Then `$relList[0]` indexed the first character of the string (e.g., `"E"` from `"Engine/..."`) instead of returning the whole path. Fix: wrap the entire `if/else` in `@()` — `$relList = @(if ($isBatch) { ... } else { ... })`. Batch files worked because `$rel -split '\|'` returns a multi-element array that survives unwrapping.

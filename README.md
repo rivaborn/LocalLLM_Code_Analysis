@@ -1,12 +1,15 @@
 # LocalLLM Code Analysis
 
-A PowerShell + clangd toolkit that generates per-file and subsystem-level **architecture
-documentation** for large C++ codebases. It drives an LLM backend — a local model via the
+A PowerShell + LSP toolkit that generates per-file and subsystem-level **architecture
+documentation** for large codebases. It drives an LLM backend — a local model via the
 [LLMConfig](https://github.com/rivaborn/LLMConfig) vLLM/Ollama gateway, or the `claude` CLI — over
-an incremental, resumable pipeline, with LSP-powered semantic context from clangd.
+an incremental, resumable pipeline, with LSP-powered semantic context from a language server.
 
-Originally built against the Unreal Engine 5.x source tree (the bundled prompts/preset target UE),
-but the pipeline is codebase-agnostic via presets.
+Originally built against the Unreal Engine 5.x source tree with clangd; the extraction stage is
+now **multi-language via profiles** (`llm_profiles\`): C/C++ (clangd), Lua (lua-language-server),
+Python (jedi-language-server), TypeScript/JS (typescript-language-server), Go (gopls). A preset
+(codebase-level: `unreal`, `quake`, `koreader`, ...) selects file filters + prompt flavor and names
+the language profile it uses; bare runs pick the profile via `.env` `PROFILE`.
 
 ## Pipeline
 
@@ -52,6 +55,35 @@ Scope any script to a subtree with `-TargetDir <path>`.
 On the local backends, files that hit the degrade path are escalated once to a named claude model when `DEGRADE_FALLBACK_MODEL` is set (empty = disabled).
 
 See `llm_scripts/llm_core.ps1` for the implementation and `.env.example` for all keys.
+
+## Language profiles
+
+`llm_profiles\<name>.json` describes everything language-specific: the LSP server command +
+launch args, languageId, rootUri/workspaceFolders strategy, warmup (fixed sleep vs polling
+documentSymbol until the workspace scan finishes), per-server prereq checks (severity
+warn/error, with fix hints), dependency-scan regexes (`#include` / `require` / `import`),
+comment markers + code fence, RAM sizing + process names for the RAM gauge, and doc-gen
+behavior (trivial-file patterns, data-blob comment prefixes, header bundling / pattern cache
+opt-in — currently cpp-only). Both the PowerShell layer and `serena_extract.py` read the same
+JSON. Example end-to-end run against KOReader (Lua):
+
+```powershell
+cd C:\path\to\koreader
+.\llm_scripts\serena_extract.ps1 -Preset koreader -Workers 4   # free; LSP extract
+.\llm_scripts\archgen.ps1        -Preset koreader -Jobs 1      # per-file docs
+.\llm_scripts\archxref.ps1                                     # free
+.\llm_scripts\archgraph.ps1                                    # free
+.\llm_scripts\arch_overview.ps1                                # subsystem synthesis
+```
+
+Server installs: clangd (needs `compile_commands.json` + background index),
+lua-language-server (release zip on PATH or `-ServerPath`), `uv tool install
+jedi-language-server`, `npm install -g typescript-language-server typescript` **plus
+`npm install typescript` in the target workspace** (the server refuses to initialize
+without a workspace TypeScript), `go install golang.org/x/tools/gopls@latest`.
+`SERENA_LSP_DEBUG=1` surfaces a server's stderr when extraction returns empty symbols.
+Regression: `tests\run_golden_gate.ps1` re-extracts the C++ fixture and diffs byte-for-byte
+against the committed golden output.
 
 ## Documentation
 
