@@ -188,7 +188,7 @@ A run on a backend is selected entirely by `.env` (`LLM_BACKEND`, `LLM_DEFAULT_M
 
 ```powershell
 $body = @{ server='ollama'; model='qwen3.6:27B'; lane='primary' } | ConvertTo-Json
-Invoke-RestMethod 'http://192.168.1.40:11430/api/load' -Method Post -ContentType 'application/json' -Body $body
+Invoke-RestMethod 'http://192.168.1.15:11430/api/load' -Method Post -ContentType 'application/json' -Body $body
 ```
 
 A/B doc sets from this benchmark are kept under `ab_rhi/` (`qwen36_min`, `haiku`, `coder30`, and

@@ -804,7 +804,7 @@ The LLM-driven stages (`archgen.ps1`, `archgen_dirs.ps1`, `arch_overview.ps1`, `
 | `LLM_BACKEND` | Target                                                      | Model selection                                                                                       |
 |---------------|-------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
 | `ollama`      | **Default.** Raw Ollama server (`/api/chat`).               | `LLM_DEFAULT_MODEL` (default `qwen3.6:27B`, a thinking model). `LLM_THINK=true` separates reasoning.   |
-| `vllm`        | LLMConfig OpenAI gateway at `http://192.168.1.40:11430/v1`. | `LLM_DEFAULT_MODEL` (e.g. `qwen3-coder-30b`, a vLLM served-name with hyphens).                         |
+| `vllm`        | LLMConfig OpenAI gateway at `http://192.168.1.15:11430/v1`. | `LLM_DEFAULT_MODEL` (e.g. `qwen3-coder-30b`, a vLLM served-name with hyphens).                         |
 | `claude`      | `claude` CLI. Only backend needing `CLAUDE{1,2}_CONFIG_DIR`. | `CLAUDE_MODEL` (`haiku`/`sonnet`) with `TIERED_MODEL` auto-upgrade (see below).                |
 
 `llm_core.ps1` exposes `Get-LLMBackend`, `Get-LLMEndpoint`, `Get-LLMModel`, and `Invoke-LocalLLM`. Model id conventions differ: vLLM served-names use hyphens (`qwen3.6-27b`), Ollama tags use colons (`qwen3.6:27B`).

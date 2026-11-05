@@ -4,7 +4,7 @@
 
 Scripts live in `llm_scripts/`, prompts in `llm_prompts/`, docs in `llm_doc/`, and deprecated bash ports in `llm_Dep/`. Run scripts from the codebase root as `.\llm_scripts\<name>.ps1`.
 
-The LLM-driven stages can run against a local LLM (ollama or a vLLM gateway) or the `claude` CLI, selected by `LLM_BACKEND` in `.env`. The default backend is `ollama` (`qwen3.6:27B`, a thinking model); `vllm` targets the gateway at `192.168.1.40:11430` (`qwen3-coder-30b`); `claude` is the Claude CLI path. The shared backend module is `llm_scripts/llm_core.ps1`.
+The LLM-driven stages can run against a local LLM (ollama or a vLLM gateway) or the `claude` CLI, selected by `LLM_BACKEND` in `.env`. The default backend is `ollama` (`qwen3.6:27B`, a thinking model); `vllm` targets the gateway at `192.168.1.15:11430` (`qwen3-coder-30b`); `claude` is the Claude CLI path. The shared backend module is `llm_scripts/llm_core.ps1`.
 
 ## Pipeline Scripts (PowerShell)
 

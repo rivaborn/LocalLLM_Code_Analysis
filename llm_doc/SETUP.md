@@ -189,7 +189,7 @@ The original `.sh` ports predate the local-LLM backend and assume the `claude` C
 - **PowerShell 5.1+** (Windows). The toolkit is PowerShell-first; the bash ports in `llm_Dep/` are deprecated.
 - **An LLM backend** selected by `LLM_BACKEND` in `.env` (see Section 6):
   - `ollama` (**default**) - network access to the LLMConfig/Ollama host at `LLM_HOST` (default `192.168.1.40:11434`) serving `qwen3.6:27B`.
-  - `vllm` - the LLMConfig OpenAI gateway at `http://192.168.1.40:11430`.
+  - `vllm` - the LLMConfig OpenAI gateway at `http://192.168.1.15:11430`.
   - `claude` - **Claude CLI** installed and in `$PATH` (`claude --version`) plus a **Claude Pro account** (two recommended for rate-limit rotation). Required ONLY when `LLM_BACKEND=claude`.
 
 ### Optional (for LSP extraction, Step 0)
@@ -281,7 +281,7 @@ Create a `.env` file at the codebase root. All variables are optional; the only 
 The LLM-driven stages (Steps 0b, 1, 4, 5) run against the backend selected by `LLM_BACKEND`:
 
 - **`ollama`** (**default**) - raw Ollama server at `http://<LLM_HOST>:<LLM_PORT>` serving `qwen3.6:27B`, a thinking model. Reasoning is separated via the native `/api/chat` endpoint with `LLM_THINK=true`.
-- **`vllm`** - the LLMConfig OpenAI `/v1` gateway at `http://192.168.1.40:11430` (served-name e.g. `qwen3-coder-30b`; the gateway auto-loads the model on first request).
+- **`vllm`** - the LLMConfig OpenAI `/v1` gateway at `http://192.168.1.15:11430` (served-name e.g. `qwen3-coder-30b`; the gateway auto-loads the model on first request).
 - **`claude`** - the `claude` CLI path (haiku/sonnet via the `CLAUDE_*` keys). This is the only backend that requires a Claude account + `CLAUDE1_CONFIG_DIR`/`CLAUDE2_CONFIG_DIR`.
 
 Implemented in `llm_scripts/llm_core.ps1` (dot-sourced by every LLM-calling script and worker).
@@ -1214,7 +1214,7 @@ claude --version
 
 ### Cannot reach the LLM backend (`ollama` / `vllm`)
 
-Verify network access to the LLMConfig host at `LLM_HOST` (default `192.168.1.40`). For Ollama, check `http://<LLM_HOST>:11434/api/tags`; for the vLLM gateway, check `http://192.168.1.40:11430/v1/models`. Confirm `LLM_BACKEND`, `LLM_HOST`, and `LLM_DEFAULT_MODEL` in `.env` match the server.
+Verify network access to the LLMConfig host at `LLM_HOST` (default `192.168.1.40`). For Ollama, check `http://<LLM_HOST>:11434/api/tags`; for the vLLM gateway, check `http://192.168.1.15:11430/v1/models`. Confirm `LLM_BACKEND`, `LLM_HOST`, and `LLM_DEFAULT_MODEL` in `.env` match the server.
 
 ### Rate limit persists after switching accounts
 

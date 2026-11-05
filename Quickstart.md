@@ -215,7 +215,7 @@ Pass 2: selective re-analysis with architecture context.
 The LLM-driven stages run against the backend selected by `LLM_BACKEND` in `.env`:
 
 - **`ollama`** (default) — local Ollama server at `LLM_HOST:LLM_PORT` (default `192.168.1.40:11434`), model `qwen3.6:27B` (a thinking model; `LLM_THINK=true`).
-- **`vllm`** — OpenAI-compatible gateway at `192.168.1.40:11430`, model `qwen3-coder-30b`.
+- **`vllm`** — OpenAI-compatible gateway at `192.168.1.15:11430`, model `qwen3-coder-30b`.
 - **`claude`** — `claude` CLI (haiku/sonnet via the `CLAUDE_*` keys, dual-account rotation).
 
 The model/tier columns below describe the **claude** backend; on the local backends, every call uses `LLM_DEFAULT_MODEL`.
